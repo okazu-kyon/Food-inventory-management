@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.3</title>
+    <title>Food Manager v1.4.4</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -31,6 +31,7 @@
             box-sizing: border-box;
         }
 
+        /* 1. デザイン・レイアウトの固定 */
         #camera-section {
             height: 33vh; width: 100%; position: relative;
             background: #000; overflow: hidden; flex-shrink: 0;
@@ -63,9 +64,6 @@
         .no-photo { font-size: 9px; color: #444; }
 
         .input-form-area { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-        .input-group { display: flex; flex-direction: column; width: 100%; }
-        .input-group label { font-size: 11px; color: #888; margin-bottom: 4px; text-align: left; }
-        
         input {
             width: 100%; height: 48px; min-height: 48px; background: #000; border: 1px solid #333;
             color: #fff; padding: 0 12px; border-radius: 8px; box-sizing: border-box; font-size: 16px;
@@ -111,14 +109,18 @@
             padding-bottom: calc(18px + env(safe-area-inset-bottom));
         }
 
+        /* 拡大・移動の最適化 */
         #img-container {
             width: 100%; aspect-ratio: 1/1; overflow: hidden; position: relative;
             border-radius: 12px; background: #000; margin-bottom: 20px; touch-action: none;
+            -webkit-mask-image: -webkit-radial-gradient(white, black); /* iOS丸角チラつき対策 */
         }
         #edit-img {
             width: 100%; height: 100%; object-fit: cover;
             position: absolute; top: 0; left: 0;
-            transition: transform 0.1s ease-out; transform-origin: center;
+            will-change: transform; /* GPU加速の事前準備 */
+            transform: translate3d(0,0,0) scale(1); /* ハードウェア加速強制 */
+            transition: transform 0.05s linear; /* 追従性を高めるため極短く設定 */
         }
 
         canvas { display: none; }
@@ -128,7 +130,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.3</div>
+        <div class="ver-label">v1.4.4</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -141,8 +143,8 @@
                 <span class="no-photo" id="no-photo-text">未撮影</span>
             </div>
             <div class="input-form-area">
-                <div class="input-group"><label>食品名</label><input type="text" id="input-name" placeholder="例：豚肉"></div>
-                <div class="input-group"><label>期限日付</label><input type="date" id="input-date"></div>
+                <div class="input-group"><label style="font-size:11px;color:#888;">食品名</label><input type="text" id="input-name" placeholder="例：豚肉"></div>
+                <div class="input-group"><label style="font-size:11px;color:#888;">期限日付</label><input type="date" id="input-date"></div>
             </div>
         </div>
         <div id="bottom-controls">
@@ -171,8 +173,8 @@
             <img id="edit-img" src="">
         </div>
         <div id="detail-view">
-            <div class="detail-input-group"><label>食品名</label><input type="text" id="edit-name"></div>
-            <div class="detail-input-group"><label>期限日付</label><input type="date" id="edit-date"></div>
+            <div class="input-group"><label style="font-size:11px;color:#888;">食品名</label><input type="text" id="edit-name"></div>
+            <div class="input-group" style="margin-top:10px;"><label style="font-size:11px;color:#888;">期限日付</label><input type="date" id="edit-date"></div>
             <div style="display:flex; gap:10px; margin-top:20px;">
                 <button id="update-btn" style="flex:2; background:var(--accent-color); color:#000; border:none; padding:15px; border-radius:10px; font-weight:bold;">更新する</button>
                 <button id="delete-btn" style="flex:1; background:#cc0000; color:#fff; border:none; padding:15px; border-radius:10px; font-weight:bold;">削除</button>
@@ -213,7 +215,7 @@
         try {
             const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
             video.srcObject = s;
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Camera access failed", e); }
     }
 
     document.getElementById('shutter-btn').addEventListener('click', () => {
@@ -225,7 +227,7 @@
         capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block'; noPhotoText.style.display = 'none';
-        statusBar.innerText = "撮影成功！";
+        statusBar.innerText = "撮影しました！";
     });
 
     document.getElementById('save-btn').addEventListener('click', () => {
@@ -246,7 +248,7 @@
         });
     });
 
-    // 画像外へのスクロールを禁止した拡大・パン
+    // スムーズな拡大・パン操作ロジック
     let scale = 1, lastScale = 1;
     let posX = 0, posY = 0, startX = 0, startY = 0;
     let initialDist = 0;
@@ -275,8 +277,8 @@
             scale = Math.min(Math.max(1, lastScale * (dist / initialDist)), 4);
         }
 
-        // バウンダリ制限（画像が枠内に収まるように移動量を制限）
-        const limit = (containerSize * scale - containerSize) / 2;
+        // バウンダリ計算の最適化
+        const limit = Math.max(0, (containerSize * scale - containerSize) / 2);
         posX = Math.min(limit, Math.max(-limit, posX));
         posY = Math.min(limit, Math.max(-limit, posY));
 
@@ -284,7 +286,8 @@
     });
 
     function updateTransform() {
-        editImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+        // translate3dを使用してGPUを強制的に使用
+        editImg.style.transform = `translate3d(${posX}px, ${posY}px, 0) scale(${scale})`;
     }
 
     function openEdit(id, name, date, img) {
