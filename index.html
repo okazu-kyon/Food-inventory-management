@@ -3,48 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>冷蔵庫管理 v1.0.2</title>
+    <title>冷蔵庫管理 v1.0.3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root { --primary-color: #4CAF50; --accent-color: #ff5252; --bg-color: #f4f4f4; }
-        body { margin: 0; padding: 0; font-family: sans-serif; background-color: var(--bg-color); touch-action: manipulation; overflow: hidden; }
+        body { margin: 0; padding: 0; font-family: sans-serif; background-color: var(--bg-color); touch-action: manipulation; }
         #app-container { display: flex; flex-direction: column; height: 100vh; max-width: 600px; margin: 0 auto; background: #fff; }
         
-        /* 1. カメラエリア (ガイド枠をより鮮明に) */
-        #camera-section { position: relative; width: 100%; height: 40vh; background: #000; }
+        #camera-section { position: relative; width: 100%; height: 35vh; background: #000; }
         #interactive.viewport { width: 100%; height: 100%; }
         #interactive.viewport video { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 日付読み取り専用の狭いターゲット枠 */
         .scan-guide { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 70%; height: 30%; border: 3px solid var(--accent-color); 
+            width: 80%; height: 40%; border: 2px solid var(--accent-color); 
             box-shadow: 0 0 0 4000px rgba(0,0,0,0.5); z-index: 10; pointer-events: none; 
         }
-        .scan-guide::after {
-            content: "ここに日付を合わせてください"; color: white; position: absolute; top: -25px; left: 0; font-size: 12px; width: 100%; text-align: center;
-        }
 
-        #status-bar { padding: 8px; font-size: 12px; background: #333; color: #fff; text-align: center; }
+        #status-bar { padding: 10px; font-size: 13px; background: #222; color: #fff; text-align: center; min-height: 1.2em; }
+        #error-log { color: #ff5252; font-size: 11px; padding: 5px; display: none; background: #fff1f1; border-top: 1px solid #ff5252; }
 
-        /* 2. 操作エリア */
         #control-section { padding: 15px; border-bottom: 1px solid #ddd; }
         .btn-group { display: flex; gap: 8px; margin-bottom: 10px; }
-        button { flex: 1; padding: 12px; font-size: 14px; border: none; border-radius: 8px; color: white; background: var(--primary-color); font-weight: bold; }
-        input { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        button { flex: 1; padding: 15px; font-size: 14px; border: none; border-radius: 8px; color: white; background: var(--primary-color); font-weight: bold; }
+        button:disabled { background: #ccc; }
         
-        /* プレビュー用隠しキャンバス（デバッグ用） */
-        #debug-canvas { display: none; width: 100%; height: auto; border: 1px solid #000; }
-
-        #list-section { flex: 1; overflow-y: auto; padding: 10px; background: #eee; }
-        .item-card { background: #fff; padding: 10px; margin-bottom: 8px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid var(--primary-color); }
+        input { width: 100%; padding: 12px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        
+        #list-section { flex: 1; overflow-y: auto; padding: 10px; background: #fdfdfd; }
+        .item-card { background: #fff; padding: 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 5px solid var(--primary-color); }
     </style>
 </head>
 <body>
 
 <div id="app-container">
-    <div id="status-bar">v1.0.2: 準備完了</div>
+    <div id="status-bar">システム起動中...</div>
+    <div id="error-log"></div>
+
     <div id="camera-section">
         <div id="interactive" class="viewport"></div>
         <div class="scan-guide"></div>
@@ -52,15 +48,13 @@
 
     <div id="control-section">
         <div class="btn-group">
-            <button onclick="startScan()">バーコード</button>
-            <button onclick="processOCR()" style="background:#E91E63">賞味期限を抽出</button>
+            <button id="btn-barcode" onclick="startBarcode()">バーコード</button>
+            <button id="btn-ocr" onclick="processOCR()" style="background:#673AB7">賞味期限抽出</button>
         </div>
         <input type="text" id="p-name" placeholder="商品名またはコード">
-        <input type="text" id="p-expiry" placeholder="賞味期限 (自動抽出されます)">
-        <button onclick="saveItem()" style="background:#2196F3; width:100%">冷蔵庫に保存</button>
+        <input type="text" id="p-expiry" placeholder="賞味期限">
+        <button onclick="saveItem()" style="background:#2196F3; width:100%">保存</button>
     </div>
-
-    <canvas id="debug-canvas"></canvas>
 
     <div id="list-section">
         <div id="inventory"></div>
@@ -69,91 +63,109 @@
 
 <script>
     const statusBox = document.getElementById('status-bar');
-    const pName = document.getElementById('p-name');
-    const pExpiry = document.getElementById('p-expiry');
+    const errorLog = document.getElementById('error-log');
+    let worker = null;
 
-    function updateStatus(msg) {
+    function log(msg, isError = false) {
         statusBox.innerText = msg;
-        console.log("[v1.0.2]", msg);
+        console.log(`[v1.0.3] ${msg}`);
+        if (isError) {
+            errorLog.innerText = msg;
+            errorLog.style.display = 'block';
+        }
     }
 
-    // カメラ起動
-    function startScan() {
-        updateStatus("カメラ初期化中...");
+    // Tesseractの事前準備
+    async function initOCR() {
+        log("OCR準備中...");
+        try {
+            worker = await Tesseract.createWorker('eng', 1, {
+                logger: m => {
+                    if (m.status === 'recognizing text') {
+                        log(`解析中: ${Math.floor(m.progress * 100)}%`);
+                    }
+                }
+            });
+            log("OCR準備完了。スキャンできます。");
+        } catch (e) {
+            log("OCR初期化失敗: " + e.message, true);
+        }
+    }
+
+    // バーコードスキャン開始
+    function startBarcode() {
+        errorLog.style.display = 'none';
+        log("カメラ起動中...");
         Quagga.init({
             inputStream: {
                 type: "LiveStream",
                 target: document.querySelector('#interactive'),
                 constraints: { facingMode: "environment" }
             },
-            decoder: { readers: ["ean_reader"] }
+            decoder: { readers: ["ean_reader", "ean_8_reader"] }
         }, (err) => {
-            if (err) { updateStatus("カメラ起動エラー: " + err.name); return; }
+            if (err) { log("カメラ起動エラー: " + err.name, true); return; }
             Quagga.start();
-            updateStatus("バーコード読み取り中...");
+            log("バーコード読み取り中...");
         });
 
         Quagga.onDetected((res) => {
-            pName.value = res.codeResult.code;
-            updateStatus("バーコード読取完了");
+            document.getElementById('p-name').value = res.codeResult.code;
+            log("バーコード読取完了！");
+            Quagga.stop();
         });
     }
 
-    // OCR処理：枠内のみをクロップして解析
+    // 賞味期限抽出（OCR）
     async function processOCR() {
         const video = document.querySelector('video');
-        if (!video) { updateStatus("先にカメラを起動してください"); return; }
+        if (!video) { log("先にバーコードボタンでカメラを起動してください", true); return; }
+        if (!worker) { log("OCRエンジンが未準備です。数秒お待ちください。", true); return; }
 
-        updateStatus("画像をキャプチャ中...");
-        
+        log("キャプチャ中...");
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // ビデオの現在の解像度を取得
-        const vW = video.videoWidth;
-        const vH = video.videoHeight;
-        
-        // ガイド枠（70% x 30%）に対応する領域を計算
-        const cropW = vW * 0.7;
-        const cropH = vH * 0.3;
-        const cropX = (vW - cropW) / 2;
-        const cropY = (vH - cropH) / 2;
+        // 枠内の領域だけを計算
+        const scale = video.videoWidth / video.clientWidth;
+        const cropW = (video.clientWidth * 0.8) * scale;
+        const cropH = (video.clientHeight * 0.4) * scale;
+        const cropX = (video.videoWidth - cropW) / 2;
+        const cropY = (video.videoHeight - cropH) / 2;
 
         canvas.width = cropW;
         canvas.height = cropH;
-
-        // 枠内だけを切り抜き、かつ白黒に加工
-        ctx.filter = 'grayscale(100%) contrast(150%)';
+        
+        // 画像処理：グレースケールとコントラスト
+        ctx.filter = 'grayscale(1) contrast(2)';
         ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-        updateStatus("文字を解析しています...");
         try {
-            const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
-            updateStatus("解析成功");
-            
-            // 日付らしいパターン (202x/xx/xx や xx-xx-xx 等) を探す
-            const dateMatch = text.match(/\d{2,4}[./-]\d{1,2}[./-]\d{1,2}/);
-            if (dateMatch) {
-                pExpiry.value = dateMatch[0].replace(/[.\/]/g, '-');
-            } else {
-                // 日付が見つからない場合は生データを短くして入れる（確認用）
-                pExpiry.value = text.replace(/[^0-9.\/-]/g, '').substring(0, 10);
-                updateStatus("日付を特定できませんでした");
-            }
+            const { data: { text } } = await worker.recognize(canvas);
+            log("解析完了");
+            // 日付パターン抽出
+            const match = text.match(/\d{2,4}[./-]\d{1,2}[./-]\d{1,2}/);
+            document.getElementById('p-expiry').value = match ? match[0] : text.replace(/[^0-9.\/-]/g, '').substring(0, 10);
+            if (!match) log("日付が見つかりませんでした。再試行してください。");
         } catch (e) {
-            updateStatus("解析エラー: " + e.message);
+            log("解析エラー: " + e.message, true);
         }
     }
 
     function saveItem() {
-        if (!pName.value) return;
-        const item = document.createElement('div');
-        item.className = 'item-card';
-        item.innerHTML = `<strong>${pName.value}</strong><br><small>期限: ${pExpiry.value || '未設定'}</small>`;
-        document.getElementById('inventory').prepend(item);
-        pName.value = ""; pExpiry.value = "";
-        updateStatus("保存しました");
+        const name = document.getElementById('p-name').value;
+        const exp = document.getElementById('p-expiry').value;
+        if (!name) return;
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `<strong>${name}</strong><br><small>期限: ${exp}</small>`;
+        document.getElementById('inventory').prepend(card);
+        document.getElementById('p-name').value = "";
+        document.getElementById('p-expiry').value = "";
+        log("リストに保存しました");
     }
+
+    window.onload = initOCR;
 </script>
 </body>
 </html>
