@@ -7,8 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
-            --bg-color: #111111;
-            --panel-bg: #222222;
+            --bg-color: #0d0d0d;
+            --panel-bg: #1a1a1a;
             --accent-color: #00ff00;
             --name-color: #00ccff;
             --warning-color: #ff4444;
@@ -26,9 +26,9 @@
             display: flex; flex-direction: column; width: 100%; height: 100vh;
         }
 
-        /* 上部：カメラエリア（比率を縮小） */
+        /* 上部：カメラエリア（40%に縮小） */
         #camera-section {
-            flex: 0.35; position: relative; background: #000; overflow: hidden;
+            height: 40%; position: relative; background: #000; overflow: hidden;
         }
         video { width: 100%; height: 100%; object-fit: cover; }
 
@@ -38,30 +38,42 @@
             pointer-events: none;
         }
         .guide-box {
-            width: 85%; height: 70px; border: 2px solid #fff; border-radius: 8px;
-            box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.4);
+            width: 75%; height: 70px; border: 2px solid #fff; border-radius: 8px;
+            box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
         }
 
-        /* 下部：操作パネル（上に引き上げ） */
+        /* ヘッダー/ステータス */
+        #top-bar {
+            position: absolute; top: 0; width: 100%; display: flex; 
+            justify-content: space-between; align-items: center;
+            padding: 8px 12px; box-sizing: border-box; z-index: 30;
+            background: rgba(0,0,0,0.4);
+        }
+        .btn-reload {
+            background: #444; color: #fff; border: 1px solid #666; 
+            padding: 4px 12px; border-radius: 4px; font-size: 13px; font-weight: bold;
+        }
+
+        /* 下部：操作パネル（上方にシフト） */
         #panel-section {
-            flex: 0.65; background: var(--panel-bg); padding: 10px 15px;
-            border-top: 1px solid #444; z-index: 20;
-            box-sizing: border-box;
+            flex: 1; background: var(--panel-bg); padding: 10px 15px;
+            border-top: 1px solid #333; z-index: 20;
+            display: flex; flex-direction: column; gap: 8px;
         }
 
-        .ver-badge { font-size: 9px; color: #666; text-align: right; }
+        .ver-badge { font-size: 9px; color: #555; text-align: right; margin-top: -5px; }
 
-        .input-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
-        .input-group { flex: 1; }
-        .input-group label { font-size: 10px; color: #aaa; display: block; margin-bottom: 2px; }
+        .input-row { display: flex; align-items: stretch; gap: 8px; }
+        .input-group { flex: 1; display: flex; flex-direction: column; }
+        .input-group label { font-size: 10px; color: #888; margin-bottom: 2px; }
         input { 
-            width: 100%; background: #000; border: 1px solid #555; color: #fff; 
-            padding: 10px; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+            width: 100%; background: #000; border: 1px solid #444; color: #fff; 
+            padding: 10px; border-radius: 6px; box-sizing: border-box; font-size: 16px;
         }
 
         .btn-action {
-            padding: 10px 12px; border-radius: 8px; border: none; font-size: 12px; font-weight: bold;
-            white-space: nowrap; cursor: pointer;
+            width: 80px; border-radius: 6px; border: none; font-size: 12px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
         }
         .btn-name { background: var(--name-color); color: #000; }
         .btn-date { background: var(--accent-color); color: #000; }
@@ -73,27 +85,21 @@
         }
 
         #status-bar {
-            background: rgba(0,0,0,0.5); color: #ccc; font-size: 10px;
-            padding: 3px 10px; text-align: center;
+            background: rgba(0,0,0,0.7); color: #0f0; font-size: 11px;
+            padding: 4px; text-align: center; border-radius: 4px;
         }
 
-        /* 履歴パネル */
+        .controls-extra { display: flex; justify-content: space-between; margin-top: 5px; }
+        .btn-sub { font-size: 12px; color: #aaa; background: #333; border: none; padding: 8px 20px; border-radius: 15px; }
+
+        /* 履歴 */
         #history-panel {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: none; padding: 20px; box-sizing: border-box; overflow-y: auto;
         }
-
-        .history-item { border-bottom: 1px solid #222; padding: 10px 0; }
-        .h-top { display: flex; justify-content: space-between; }
+        .history-item { border-bottom: 1px solid #222; padding: 12px 0; }
         .h-name { color: var(--name-color); font-weight: bold; }
-        .h-days { font-size: 12px; padding: 2px 6px; border-radius: 4px; }
-        .days-ok { background: #004400; color: var(--accent-color); }
-        .days-warn { background: #440000; color: var(--warning-color); }
-        .h-info { font-size: 11px; color: #888; }
-
-        .controls-extra { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
-        .btn-sub { font-size: 11px; color: #fff; background: #333; border: 1px solid #555; padding: 8px 15px; border-radius: 15px; }
-        .btn-refresh { background: #444; border-color: #666; }
+        .h-days { float: right; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
 
         canvas { display: none; }
     </style>
@@ -102,20 +108,23 @@
 
 <div id="main-container">
     <div id="camera-section">
+        <div id="top-bar">
+            <span style="font-size: 10px; color: #888;">Food Manager</span>
+            <button class="btn-reload" onclick="location.reload()">更新</button>
+        </div>
         <video id="camera-view" playsinline autoplay muted></video>
         <div class="overlay">
             <div class="guide-box" id="main-guide"></div>
         </div>
-        <div id="status-bar" style="position: absolute; bottom: 0; width: 100%;">Ready</div>
     </div>
 
     <div id="panel-section">
-        <div class="ver-badge">Ver. 1.1.3</div>
+        <div id="status-bar">カメラ準備中...</div>
         
         <div class="input-row">
             <div class="input-group">
                 <label>食品名</label>
-                <input type="text" id="input-name" placeholder="---">
+                <input type="text" id="input-name" placeholder="読取ボタンを押す">
             </div>
             <button id="scan-name-btn" class="btn-action btn-name">名前読取</button>
         </div>
@@ -123,17 +132,16 @@
         <div class="input-row">
             <div class="input-group">
                 <label>期限日付</label>
-                <input type="text" id="input-date" placeholder="---">
+                <input type="text" id="input-date" placeholder="読取ボタンを押す">
             </div>
             <button id="scan-date-btn" class="btn-action btn-date">日付読取</button>
         </div>
 
-        <button id="save-btn" class="btn-save">リストに保存する</button>
+        <button id="save-btn" class="btn-save">リストに保存</button>
 
         <div class="controls-extra">
-            <button id="toggle-history" class="btn-sub">履歴表示</button>
-            <button id="restart-btn" class="btn-sub">再起動</button>
-            <button id="refresh-page-btn" class="btn-sub btn-refresh">更新</button>
+            <button id="toggle-history" class="btn-sub">履歴を表示</button>
+            <div class="ver-badge">v1.1.3</div>
         </div>
     </div>
 
@@ -143,14 +151,13 @@
             <button onclick="toggleHistory()" style="background:#333; color:#fff; border:none; border-radius:50%; width:35px; height:35px;">×</button>
         </div>
         <div id="history-list"></div>
-        <button onclick="clearHistory()" style="width:100%; margin-top:20px; padding:12px; background:#400; color:#f66; border:none; border-radius:8px;">履歴を全削除</button>
+        <button onclick="clearHistory()" style="width:100%; margin-top:30px; padding:12px; background:#400; color:#f66; border:none; border-radius:8px;">全削除</button>
     </div>
 </div>
 
 <canvas id="canvas-temp"></canvas>
 
 <script>
-    const VERSION = "1.1.3";
     const video = document.getElementById('camera-view');
     const inputName = document.getElementById('input-name');
     const inputDate = document.getElementById('input-date');
@@ -162,7 +169,7 @@
     let initialPinchDistance = null;
     let worker = null;
 
-    // iOS ズームバグ防止
+    // iOS ズームバグ徹底ガード
     document.addEventListener('touchstart', (e) => { if (e.touches.length > 1) return; }, { passive: false });
     let lastTouchTime = 0;
     document.addEventListener('touchend', (e) => {
@@ -173,34 +180,51 @@
 
     async function initOCR() {
         if (worker) return;
-        statusBar.innerText = "読取エンジン準備中...";
-        worker = await Tesseract.createWorker(['jpn', 'eng']);
-        statusBar.innerText = "Ready";
+        statusBar.innerText = "OCR準備中...";
+        try {
+            worker = await Tesseract.createWorker(['jpn', 'eng']);
+            statusBar.innerText = "Ready";
+        } catch(e) {
+            statusBar.innerText = "OCRエラー: " + e.message;
+        }
     }
 
     async function startCamera() {
-        if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); }
+        statusBar.innerText = "カメラを起動しています...";
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
             });
             video.srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
-            video.onloadedmetadata = () => { video.play(); applyZoom(1.5); };
+            video.onloadedmetadata = () => {
+                video.play();
+                applyZoom(1.5);
+                statusBar.innerText = "Ready (ピンチでズーム)";
+            };
         } catch (err) {
-            statusBar.innerText = "カメラエラー";
-            console.error(err);
+            let msg = "起動失敗";
+            if (err.name === 'NotAllowedError') msg = "カメラ許可が必要です";
+            else if (err.name === 'NotFoundError') msg = "カメラが見つかりません";
+            statusBar.innerText = "カメラエラー: " + msg;
+            console.error("Camera Error Log:", err);
         }
     }
 
     async function applyZoom(val) {
         if (!videoTrack) return;
-        const cap = videoTrack.getCapabilities();
-        if (cap.zoom) {
-            currentZoom = Math.max(cap.zoom.min, Math.min(val, cap.zoom.max));
-            await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-            statusBar.innerText = `ズーム: ${currentZoom.toFixed(1)}x`;
-        }
+        try {
+            const cap = videoTrack.getCapabilities();
+            if (cap.zoom) {
+                currentZoom = Math.max(cap.zoom.min, Math.min(val, cap.zoom.max));
+                await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+            }
+        } catch(e) { console.log("Zoom not supported"); }
     }
 
     // ピンチズーム
@@ -237,14 +261,14 @@
                 const m = text.match(pattern);
                 inputDate.value = m ? m[0] : text.trim();
             }
-            statusBar.innerText = "解析完了";
+            statusBar.innerText = "読取完了";
         } catch (e) {
-            statusBar.innerText = "失敗";
+            statusBar.innerText = "解析失敗";
         }
     }
 
     document.getElementById('save-btn').addEventListener('click', () => {
-        if (!inputName.value || !inputDate.value) return alert("名前と日付を確認してください");
+        if (!inputName.value || !inputDate.value) return alert("未入力項目があります");
         const item = { 
             name: inputName.value, 
             date: inputDate.value, 
@@ -253,7 +277,7 @@
         const history = JSON.parse(localStorage.getItem('food_manager_v1') || '[]');
         history.unshift(item);
         localStorage.setItem('food_manager_v1', JSON.stringify(history));
-        statusBar.innerText = "保存完了！";
+        statusBar.innerText = "保存しました";
         inputName.value = ""; inputDate.value = "";
     });
 
@@ -262,3 +286,41 @@
         if (!d || d.length < 2) return new Date(2999, 11, 31);
         let y = d[0].length === 2 ? 2000 + parseInt(d[0]) : parseInt(d[0]);
         let m = parseInt(d[1]) - 1;
+        let day = d[2] ? parseInt(d[2]) : 1;
+        return new Date(y, m, day);
+    }
+
+    function toggleHistory() {
+        const panel = document.getElementById('history-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        if (panel.style.display === 'block') {
+            const list = JSON.parse(localStorage.getItem('food_manager_v1') || '[]');
+            const today = new Date(); today.setHours(0,0,0,0);
+            list.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+
+            document.getElementById('history-list').innerHTML = list.map(h => {
+                const targetDate = parseDate(h.date);
+                const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+                const dayText = diffDays === 0 ? "今日！" : (diffDays > 0 ? `あと${diffDays}日` : `${Math.abs(diffDays)}日切過`);
+                const color = diffDays <= 3 ? "#ff4444" : "#00ff00";
+
+                return `
+                    <div class="history-item">
+                        <div style="margin-bottom:4px;"><span class="h-name">${h.name}</span><span class="h-days" style="background:${color}; color:#000;">${dayText}</span></div>
+                        <div style="font-size:12px; color:#aaa;">期限: ${h.date} <span style="font-size:9px; margin-left:10px; color:#444;">(${h.reg}登録)</span></div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    function clearHistory() { if(confirm("全削除しますか？")) { localStorage.removeItem('food_manager_v1'); toggleHistory(); } }
+
+    document.getElementById('scan-name-btn').addEventListener('click', () => scan('name'));
+    document.getElementById('scan-date-btn').addEventListener('click', () => scan('date'));
+    document.getElementById('toggle-history').addEventListener('click', toggleHistory);
+    window.addEventListener('load', () => { startCamera(); initOCR(); });
+</script>
+
+</body>
+</html>
