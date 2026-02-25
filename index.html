@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.3.4</title>
+    <title>Food Manager v1.3.5</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -20,7 +20,7 @@
             background-color: var(--bg-color); color: var(--text-color);
             font-family: -apple-system, sans-serif;
             overflow: hidden;
-            touch-action: manipulation;
+            touch-action: none; /* 標準のズーム動作を抑制しJSで制御 */
         }
 
         #main-container {
@@ -46,10 +46,18 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            pointer-events: none;
         }
         .ver-label {
             position: absolute; top: 10px; left: 10px; 
-            font-size: 10px; color: rgba(255,255,255,0.5); z-index: 10;
+            font-size: 10px; color: rgba(255,255,255,0.4); z-index: 10;
+        }
+        .btn-reload {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(255,255,255,0.1); color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 4px 10px; border-radius: 4px; font-size: 11px;
+            z-index: 20;
         }
 
         /* メイン操作エリア */
@@ -60,16 +68,15 @@
             flex-direction: column;
             padding: 20px;
             box-sizing: border-box;
-            position: relative;
         }
 
         #status-bar {
             font-size: 11px; text-align: center; color: var(--accent-color);
             background: rgba(0,255,0,0.05); padding: 4px; border-radius: 4px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
-        .input-row { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .input-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
         .preview-box {
             width: 60px; height: 60px;
             background: #000; border: 1px solid #333; border-radius: 8px;
@@ -85,22 +92,20 @@
             background: #000; border: 1px solid #333;
             color: #fff; padding: 12px; border-radius: 8px;
             box-sizing: border-box; font-size: 16px;
+            touch-action: auto;
         }
         
-        /* 食品名入力は広めに */
         #input-name { width: 100%; }
-        
-        /* 日付入力の幅を絞る */
-        #date-group { width: 160px; margin-bottom: 20px; }
+        #date-group { width: 160px; margin-bottom: 15px; }
 
-        /* 最下部ボタンユニット（コマンドセンター） */
+        /* 最下部ボタンユニット */
         #bottom-controls {
             margin-top: auto;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 10px;
-            padding-bottom: 10px;
+            gap: 15px;
+            padding-bottom: 5px;
         }
 
         .btn-side {
@@ -110,7 +115,6 @@
             font-size: 14px;
             font-weight: bold;
             border: none;
-            cursor: pointer;
         }
         
         #save-btn { background: var(--accent-color); color: #000; }
@@ -134,7 +138,7 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: none;
             padding: 20px; padding-top: env(safe-area-inset-top); box-sizing: border-box;
-            overflow-y: auto;
+            overflow-y: auto; touch-action: auto;
         }
         .history-item {
             border-bottom: 1px solid #222; padding: 12px 0;
@@ -153,12 +157,13 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.3.4</div>
+        <div class="ver-label">v1.3.5</div>
+        <button class="btn-reload" onclick="location.reload()">再読込</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
 
     <div id="panel-section">
-        <div id="status-bar">Firebase Ready</div>
+        <div id="status-bar">Firebase Ready (ピンチでズーム)</div>
         
         <div class="input-row">
             <div class="preview-box">
@@ -167,7 +172,7 @@
             </div>
             <div class="input-group" style="flex:1;">
                 <label>食品名</label>
-                <input type="text" id="input-name" placeholder="商品名を入力">
+                <input type="text" id="input-name" placeholder="例：豚肉">
             </div>
         </div>
 
@@ -223,14 +228,17 @@
 
     async function startCamera() {
         try {
-            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+            const s = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment", width: { ideal: 1280 } } 
+            });
             video.srcObject = s;
             videoTrack = s.getVideoTracks()[0];
             video.onloadedmetadata = () => { 
                 video.play(); 
-                setTimeout(() => applyZoom(1.5), 500);
+                // 初期倍率は1.0倍に設定
+                applyZoom(1.0);
             };
-        } catch (e) { statusBar.innerText = "カメラエラー"; console.error(e); }
+        } catch (e) { statusBar.innerText = "カメラエラー"; }
     }
 
     async function applyZoom(val) {
@@ -244,6 +252,29 @@
         } catch(e) {}
     }
 
+    // ピンチズーム操作
+    document.getElementById('camera-section').addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            initialPinchDistance = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX, 
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+        }
+    }, { passive: false });
+
+    document.getElementById('camera-section').addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && initialPinchDistance) {
+            e.preventDefault();
+            const dist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX, 
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            const delta = (dist - initialPinchDistance) / 100;
+            applyZoom(currentZoom + delta);
+            initialPinchDistance = dist;
+        }
+    }, { passive: false });
+
     // 撮影
     document.getElementById('shutter-btn').addEventListener('click', () => {
         const scale = 300 / video.videoWidth;
@@ -254,7 +285,7 @@
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block';
         noPhotoText.style.display = 'none';
-        statusBar.innerText = "撮影成功！";
+        statusBar.innerText = "撮影成功！保存してください";
     });
 
     // 保存
@@ -266,7 +297,7 @@
             image: capturedImageData,
             timestamp: Date.now()
         }).then(() => {
-            statusBar.innerText = "クラウドに保存完了！";
+            statusBar.innerText = "クラウドに保存しました！";
             inputName.value = ""; inputDate.value = "";
             previewImg.style.display = 'none';
             noPhotoText.style.display = 'block';
