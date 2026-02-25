@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.5</title>
+    <title>Food Manager v1.4.6</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -108,11 +108,10 @@
             padding-bottom: calc(18px + env(safe-area-inset-bottom));
         }
 
-        /* ブラックアウト完全対策：GPUレイヤーの固定化 */
         #img-container {
             width: 100%; aspect-ratio: 1/1; overflow: hidden; position: relative;
             border-radius: 12px; background: #000; margin-bottom: 20px; touch-action: none;
-            transform: translateZ(0); /* コンテナ自体をGPU管理に */
+            transform: translateZ(0);
             perspective: 1000px;
             -webkit-backface-visibility: hidden;
         }
@@ -132,7 +131,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.5</div>
+        <div class="ver-label">v1.4.6</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -188,6 +187,14 @@
 <canvas id="canvas-temp"></canvas>
 
 <script>
+    // 起動時の自動リフレッシュ（キャッシュ対策）
+    (function() {
+        if (!sessionStorage.getItem('reloaded')) {
+            sessionStorage.setItem('reloaded', 'true');
+            location.reload();
+        }
+    })();
+
     const firebaseConfig = {
         apiKey: "AIzaSyAIy_4IGs-HXp_Yn7cX1Lt6_WjCSrCncQY",
         authDomain: "okazu-food-manager.firebaseapp.com",
@@ -250,7 +257,6 @@
         });
     });
 
-    // ブラックアウト対策版：拡大・パン操作
     let scale = 1, lastScale = 1;
     let posX = 0, posY = 0, startX = 0, startY = 0;
     let initialDist = 0;
@@ -270,7 +276,6 @@
     imgCont.addEventListener('touchmove', (e) => {
         e.preventDefault();
         const containerSize = imgCont.clientWidth;
-        
         if (e.touches.length === 1) {
             posX = e.touches[0].pageX - startX;
             posY = e.touches[0].pageY - startY;
@@ -278,15 +283,15 @@
             const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
             scale = Math.min(Math.max(1, lastScale * (dist / initialDist)), 4);
         }
-
-        // 境界値制限の厳格化
         const limit = (containerSize * scale - containerSize) / 2;
         posX = Math.min(limit, Math.max(-limit, posX));
         posY = Math.min(limit, Math.max(-limit, posY));
-
-        // ブラウザへの反映（requestAnimationFrameを使用せず直接更新で遅延を防止）
-        editImg.style.transform = `translate3d(${posX.toFixed(1)}px, ${posY.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
+        updateTransform();
     });
+
+    function updateTransform() {
+        editImg.style.transform = `translate3d(${posX.toFixed(1)}px, ${posY.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
+    }
 
     function openEdit(id, name, date, img) {
         if (isEditMode) return;
@@ -294,8 +299,7 @@
         document.getElementById('edit-name').value = name === "未入力" ? "" : name;
         document.getElementById('edit-date').value = date;
         editImg.src = img;
-        scale = 1; posX = 0; posY = 0;
-        editImg.style.transform = `translate3d(0,0,0) scale(1)`;
+        scale = 1; posX = 0; posY = 0; updateTransform();
         document.getElementById('detail-panel').style.display = 'block';
     }
 
