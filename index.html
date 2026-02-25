@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.4</title>
+    <title>Food Manager v1.4.5</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -31,7 +31,6 @@
             box-sizing: border-box;
         }
 
-        /* 1. デザイン・レイアウトの固定 */
         #camera-section {
             height: 33vh; width: 100%; position: relative;
             background: #000; overflow: hidden; flex-shrink: 0;
@@ -109,18 +108,21 @@
             padding-bottom: calc(18px + env(safe-area-inset-bottom));
         }
 
-        /* 拡大・移動の最適化 */
+        /* ブラックアウト完全対策：GPUレイヤーの固定化 */
         #img-container {
             width: 100%; aspect-ratio: 1/1; overflow: hidden; position: relative;
             border-radius: 12px; background: #000; margin-bottom: 20px; touch-action: none;
-            -webkit-mask-image: -webkit-radial-gradient(white, black); /* iOS丸角チラつき対策 */
+            transform: translateZ(0); /* コンテナ自体をGPU管理に */
+            perspective: 1000px;
+            -webkit-backface-visibility: hidden;
         }
         #edit-img {
             width: 100%; height: 100%; object-fit: cover;
             position: absolute; top: 0; left: 0;
-            will-change: transform; /* GPU加速の事前準備 */
-            transform: translate3d(0,0,0) scale(1); /* ハードウェア加速強制 */
-            transition: transform 0.05s linear; /* 追従性を高めるため極短く設定 */
+            will-change: transform;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            transform: translate3d(0,0,0) scale(1);
         }
 
         canvas { display: none; }
@@ -130,7 +132,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.4</div>
+        <div class="ver-label">v1.4.5</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -227,7 +229,7 @@
         capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block'; noPhotoText.style.display = 'none';
-        statusBar.innerText = "撮影しました！";
+        statusBar.innerText = "撮影成功！";
     });
 
     document.getElementById('save-btn').addEventListener('click', () => {
@@ -240,7 +242,7 @@
             regDate: `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`,
             timestamp: Date.now()
         }).then(() => {
-            statusBar.innerText = "✨ 保存完了しました！ ✨";
+            statusBar.innerText = "✨ 保存しました！ ✨";
             setTimeout(() => { statusBar.innerText = "準備完了"; }, 2000);
             inputName.value = ""; inputDate.value = "";
             previewImg.style.display = 'none'; noPhotoText.style.display = 'block';
@@ -248,7 +250,7 @@
         });
     });
 
-    // スムーズな拡大・パン操作ロジック
+    // ブラックアウト対策版：拡大・パン操作
     let scale = 1, lastScale = 1;
     let posX = 0, posY = 0, startX = 0, startY = 0;
     let initialDist = 0;
@@ -277,18 +279,14 @@
             scale = Math.min(Math.max(1, lastScale * (dist / initialDist)), 4);
         }
 
-        // バウンダリ計算の最適化
-        const limit = Math.max(0, (containerSize * scale - containerSize) / 2);
+        // 境界値制限の厳格化
+        const limit = (containerSize * scale - containerSize) / 2;
         posX = Math.min(limit, Math.max(-limit, posX));
         posY = Math.min(limit, Math.max(-limit, posY));
 
-        updateTransform();
+        // ブラウザへの反映（requestAnimationFrameを使用せず直接更新で遅延を防止）
+        editImg.style.transform = `translate3d(${posX.toFixed(1)}px, ${posY.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
     });
-
-    function updateTransform() {
-        // translate3dを使用してGPUを強制的に使用
-        editImg.style.transform = `translate3d(${posX}px, ${posY}px, 0) scale(${scale})`;
-    }
 
     function openEdit(id, name, date, img) {
         if (isEditMode) return;
@@ -296,7 +294,8 @@
         document.getElementById('edit-name').value = name === "未入力" ? "" : name;
         document.getElementById('edit-date').value = date;
         editImg.src = img;
-        scale = 1; posX = 0; posY = 0; updateTransform();
+        scale = 1; posX = 0; posY = 0;
+        editImg.style.transform = `translate3d(0,0,0) scale(1)`;
         document.getElementById('detail-panel').style.display = 'block';
     }
 
