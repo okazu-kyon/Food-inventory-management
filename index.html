@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.3.9</title>
+    <title>Food Manager v1.4.0</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -18,7 +18,7 @@
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: var(--bg-color); color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             overflow: hidden;
             touch-action: none;
         }
@@ -33,7 +33,7 @@
             box-sizing: border-box;
         }
 
-        /* カメラエリア（1/3） */
+        /* カメラエリア */
         #camera-section {
             height: 33vh;
             width: 100%;
@@ -68,10 +68,18 @@
             box-sizing: border-box;
         }
 
+        /* ステータス表示の巨大化 */
         #status-bar {
-            font-size: 11px; text-align: center; color: var(--accent-color);
-            background: rgba(0,255,0,0.05); padding: 4px; border-radius: 4px;
-            margin-bottom: 10px; min-height: 16px;
+            font-size: 18px; /* 大きく */
+            font-weight: bold; /* 太く */
+            text-align: center; 
+            color: var(--accent-color);
+            background: rgba(0,255,0,0.15); 
+            padding: 8px; 
+            border-radius: 8px;
+            margin-bottom: 15px; 
+            min-height: 24px;
+            transition: all 0.3s;
         }
 
         .input-row { 
@@ -85,7 +93,7 @@
             width: 70px; height: 70px;
             background: #000; border: 1px solid #333; border-radius: 8px;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0; margin-top: 20px;
+            flex-shrink: 0; margin-top: 22px;
         }
         #photo-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
         .no-photo { font-size: 9px; color: #444; }
@@ -100,16 +108,21 @@
         .input-group { display: flex; flex-direction: column; width: 100%; }
         .input-group label { font-size: 11px; color: #888; margin-bottom: 4px; text-align: left; }
         
+        /* 枠の高さと文字位置を完全に統一 */
         input {
             width: 100%; 
+            height: 48px; /* 高さを明示的に固定 */
+            min-height: 48px;
             background: #000; 
             border: 1px solid #333;
             color: #fff; 
-            padding: 12px; 
+            padding: 0 12px; /* 上下パディングを0にして中央寄せ */
             border-radius: 8px;
             box-sizing: border-box; 
             font-size: 16px;
             text-align: left; 
+            display: flex;
+            align-items: center;
             appearance: none;
             -webkit-appearance: none;
         }
@@ -140,7 +153,7 @@
         }
         #shutter-btn:active { background: #ccc; transform: scale(0.9); }
 
-        /* オーバーレイパネル */
+        /* リスト表示項目 */
         .overlay-panel {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: none;
@@ -148,7 +161,6 @@
             overflow-y: auto; touch-action: auto;
         }
 
-        /* リスト項目のデザイン復旧 */
         .history-item {
             border-bottom: 1px solid #222; padding: 12px 0;
             display: flex; align-items: center; gap: 15px;
@@ -171,7 +183,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.3.9</div>
+        <div class="ver-label">v1.4.0</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -270,7 +282,7 @@
             video.srcObject = s;
             videoTrack = s.getVideoTracks()[0];
             video.onloadedmetadata = () => { video.play(); applyZoom(1.0); };
-        } catch (e) { console.error("Camera Error:", e); statusBar.innerText = "カメラエラー"; }
+        } catch (e) { console.error(e); }
     }
 
     async function applyZoom(val) {
@@ -284,18 +296,7 @@
         } catch(e) {}
     }
 
-    document.getElementById('camera-section').addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-    }, { passive: false });
-    document.getElementById('camera-section').addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && initialPinchDistance) {
-            e.preventDefault();
-            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            applyZoom(currentZoom + (dist - initialPinchDistance) / 100);
-            initialPinchDistance = dist;
-        }
-    }, { passive: false });
-
+    // 撮影
     document.getElementById('shutter-btn').addEventListener('click', () => {
         const scale = 500 / video.videoWidth;
         canvas.width = 500;
@@ -304,9 +305,10 @@
         capturedImageData = canvas.toDataURL('image/jpeg', 0.7);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block'; noPhotoText.style.display = 'none';
-        statusBar.innerText = "撮影成功！";
+        statusBar.innerText = "撮影成功！保存してね";
     });
 
+    // 保存
     document.getElementById('save-btn').addEventListener('click', () => {
         if (!capturedImageData) return; 
         const now = new Date();
@@ -317,11 +319,12 @@
             regDate: `${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`,
             timestamp: Date.now()
         }).then(() => {
-            statusBar.innerText = "保存完了！";
+            statusBar.innerText = "✨ 保存完了しました！ ✨";
+            setTimeout(() => { statusBar.innerText = "Firebase Ready"; }, 3000);
             inputName.value = ""; inputDate.value = "";
             previewImg.style.display = 'none'; noPhotoText.style.display = 'block';
             capturedImageData = null;
-        }).catch(e => { console.error("Save Error:", e); statusBar.innerText = "保存エラー"; });
+        });
     });
 
     function openEdit(id, name, date, img) {
@@ -369,7 +372,6 @@
                         <div class="h-info">期限: ${h.date || '未設定'} ${daysLabel}</div>
                         <span class="h-reg-date">登録: ${h.regDate}</span>
                     </div>
-                    <div style="color:#333;">▶</div>
                 </div>
             `;
         }).join('');
