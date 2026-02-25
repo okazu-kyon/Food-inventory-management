@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.2.0</title>
+    <title>Food Manager v1.2.1</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -34,6 +34,18 @@
 
         #top-bar { position: absolute; top: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; box-sizing: border-box; z-index: 30; background: rgba(0,0,0,0.4); }
         .btn-reload { background: #444; color: #fff; border: 1px solid #666; padding: 4px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; }
+
+        /* ズームボタン */
+        #zoom-controls {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 10px; z-index: 40;
+        }
+        .btn-zoom {
+            background: rgba(255,255,255,0.2); color: #fff; border: 1px solid #fff;
+            width: 44px; height: 44px; border-radius: 50%; font-size: 12px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+        }
+        .btn-zoom.active { background: var(--accent-color); color: #000; border-color: var(--accent-color); }
 
         /* 下部：操作パネル */
         #panel-section { flex: 1; background: var(--panel-bg); padding: 10px 15px; border-top: 1px solid #333; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
@@ -70,8 +82,13 @@
 <div id="main-container">
     <div id="camera-section">
         <div id="top-bar">
-            <span style="font-size: 10px; color: #888;">Food Manager 家族共有版</span>
+            <span style="font-size: 10px; color: #888;">Food Manager v1.2.1</span>
             <button class="btn-reload" onclick="location.reload()">更新</button>
+        </div>
+        <div id="zoom-controls">
+            <button class="btn-zoom" onclick="changeZoom(1.0, this)">×1</button>
+            <button class="btn-zoom active" id="default-zoom" onclick="changeZoom(1.5, this)">×1.5</button>
+            <button class="btn-zoom" onclick="changeZoom(2.0, this)">×2</button>
         </div>
         <video id="camera-view" playsinline autoplay muted></video>
         <div class="overlay">
@@ -102,7 +119,7 @@
 
         <div class="controls-extra">
             <button id="toggle-history" class="btn-sub">共有リストを表示</button>
-            <div class="ver-badge">v1.2.0</div>
+            <div class="ver-badge">v1.2.1</div>
         </div>
     </div>
 
@@ -118,7 +135,7 @@
 <canvas id="canvas-temp"></canvas>
 
 <script>
-    // --- Firebase設定 ---
+    // --- Firebase設定 (imageから転記済み) ---
     const firebaseConfig = {
         apiKey: "AIzaSyAIy_4IGs-HXp_Yn7cX1Lt6_WjCSrCncQY",
         authDomain: "okazu-food-manager.firebaseapp.com",
@@ -139,29 +156,42 @@
     const canvas = document.getElementById('canvas-temp');
     
     let videoTrack = null;
-    let currentZoom = 1.0;
     let worker = null;
 
-    // カメラ・OCR・ズーム制御 (v1.1.3継承)
+    // カメラ起動
     async function startCamera() {
         if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
         try {
             const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
             video.srcObject = s;
             videoTrack = s.getVideoTracks()[0];
-            video.onloadedmetadata = () => { video.play(); applyZoom(1.5); statusBar.innerText = "Ready (家族共有中)"; };
+            video.onloadedmetadata = () => { 
+                video.play(); 
+                statusBar.innerText = "Ready (家族共有中)";
+                // 初期ズーム適用 (1.5x)
+                setTimeout(() => changeZoom(1.5, document.getElementById('default-zoom')), 500);
+            };
         } catch (e) { statusBar.innerText = "カメラエラー"; console.error(e); }
     }
 
-    async function applyZoom(v) {
+    // ズーム変更関数
+    async function changeZoom(val, btn) {
         if (!videoTrack) return;
         try {
             const cap = videoTrack.getCapabilities();
             if (cap.zoom) {
-                currentZoom = Math.max(cap.zoom.min, Math.min(v, cap.zoom.max));
-                await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+                const target = Math.max(cap.zoom.min, Math.min(val, cap.zoom.max));
+                await videoTrack.applyConstraints({ advanced: [{ zoom: target }] });
+                // ボタンの見た目を更新
+                document.querySelectorAll('.btn-zoom').forEach(b => b.classList.remove('active'));
+                if (btn) btn.classList.add('active');
+                console.log("Zoom applied:", target);
+            } else {
+                statusBar.innerText = "ズーム非対応端末です";
             }
-        } catch(e) {}
+        } catch(e) {
+            console.error("Zoom Error:", e);
+        }
     }
 
     async function scan(type) {
@@ -204,7 +234,6 @@
         return new Date(y, m, day);
     }
 
-    // 履歴表示（リアルタイム同期）
     function toggleHistory() {
         const panel = document.getElementById('history-panel');
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
@@ -214,10 +243,8 @@
         const data = snapshot.val();
         const listItems = [];
         for (let id in data) { listItems.push({ id, ...data[id] }); }
-        
         const today = new Date(); today.setHours(0,0,0,0);
         listItems.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-
         document.getElementById('history-list').innerHTML = listItems.map(h => {
             const diffDays = Math.ceil((parseDate(h.date) - today) / (86400000));
             const color = diffDays <= 3 ? "#ff4444" : "#00ff00";
