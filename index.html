@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.7</title>
+    <title>Food Manager v1.4.8</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -73,11 +73,17 @@
         .btn-side { flex: 1; height: 50px; border-radius: 25px; font-size: 14px; font-weight: bold; border: none; }
         #save-btn { background: var(--accent-color); color: #000; }
         #toggle-history { background: #333; color: #fff; }
+
+        /* シャッターボタンのデザイン刷新 */
         #shutter-btn {
             width: 75px; height: 75px; background: #fff; border: 5px solid #444; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; font-size: 28px;
+            display: flex; align-items: center; justify-content: center;
             box-shadow: 0 0 15px rgba(0,0,0,0.5); flex-shrink: 0;
+            transition: transform 0.1s active;
+            cursor: pointer;
         }
+        #shutter-btn:active { transform: scale(0.92); background: #eee; }
+        #shutter-btn svg { width: 35px; height: 35px; fill: #333; }
 
         .overlay-panel {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -131,7 +137,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.7</div>
+        <div class="ver-label">v1.4.8</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -150,7 +156,9 @@
         </div>
         <div id="bottom-controls">
             <button id="toggle-history" class="btn-side">リスト</button>
-            <div id="shutter-btn">📷</div>
+            <div id="shutter-btn">
+                <svg viewBox="0 0 24 24"><path d="M12,18c3.31,0,6-2.69,6-6s-2.69-6-6-6s-6,2.69-6,6S8.69,18,12,18z M12,8c2.21,0,4,1.79,4,4s-1.79,4-4,4s-4-1.79-4-4 S9.79,8,12,8z M20,4h-3.17L15,2H9L7.17,4H4C2.9,4,2,4.9,2,6v12c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V6C22,4.9,21.1,4,20,4z M20,18H4V6h4.05 l1.83-2h4.24l1.83,2H20V18z"/></svg>
+            </div>
             <button id="save-btn" class="btn-side">保存</button>
         </div>
     </div>
@@ -223,11 +231,9 @@
         try {
             const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
             video.srcObject = s;
-            console.log("Camera started successfully");
         } catch (e) { console.error("Camera access failed", e); }
     }
 
-    // カメラのフリーズを解除して再生する関数
     function resumeCamera() {
         if (video && video.srcObject) {
             video.play().catch(e => console.error("Camera resume failed", e));
@@ -243,7 +249,7 @@
         capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block'; noPhotoText.style.display = 'none';
-        statusBar.innerText = "撮影成功！";
+        statusBar.innerText = "撮影しました！";
     });
 
     document.getElementById('save-btn').addEventListener('click', () => {
@@ -256,7 +262,7 @@
             regDate: `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`,
             timestamp: Date.now()
         }).then(() => {
-            statusBar.innerText = "✨ 保存しました！ ✨";
+            statusBar.innerText = "✨ 保存しました ✨";
             setTimeout(() => { statusBar.innerText = "準備完了"; }, 2000);
             inputName.value = ""; inputDate.value = "";
             previewImg.style.display = 'none'; noPhotoText.style.display = 'block';
@@ -328,7 +334,7 @@
         if (confirm(`${checks.length}件削除しますか？`)) {
             checks.forEach(c => db.child(c.dataset.id).remove());
             document.getElementById('edit-mode-btn').click();
-            resumeCamera(); // 削除後もカメラ再開を念押し
+            resumeCamera();
         }
     }
 
@@ -343,7 +349,7 @@
 
     function closePanel(id) { 
         document.getElementById(id).style.display = 'none'; 
-        resumeCamera(); // パネルを閉じたらカメラを再開
+        resumeCamera();
     }
     document.getElementById('toggle-history').addEventListener('click', () => document.getElementById('history-panel').style.display = 'block');
 
