@@ -3,175 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>冷蔵庫管理 v1.0.4</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <title>QR Scanner v1.0.1</title>
     <style>
-        :root { --primary-color: #4CAF50; --accent-color: #ff5252; --bg-color: #f4f4f4; }
-        body { margin: 0; padding: 0; font-family: sans-serif; background-color: var(--bg-color); touch-action: manipulation; }
-        #app-container { display: flex; flex-direction: column; height: 100vh; max-width: 600px; margin: 0 auto; background: #fff; }
-        
-        /* 1. カメラエリア (常時表示) */
-        #camera-section { position: relative; width: 100%; height: 35vh; background: #000; }
-        #interactive.viewport { width: 100%; height: 100%; }
-        #interactive.viewport video { width: 100%; height: 100%; object-fit: cover; }
-        
-        .scan-guide { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 80%; height: 40%; border: 2px dashed #fff; 
-            box-shadow: 0 0 0 4000px rgba(0,0,0,0.5); z-index: 10; pointer-events: none; 
+        /* 1. デザイン・レイアウトの固定: 既存の配置を維持 */
+        :root {
+            /* 配色の修正: 真っ黒を避け、視認性の高いダークグレーを採用 */
+            --bg-color: #121212;
+            --overlay-color: rgba(18, 18, 18, 0.65); /* 透過度を下げて周囲を見やすく */
+            --accent-color: #00ff41;
+            --ui-element-bg: #2a2a2a;
+            --text-color: #ffffff;
         }
 
-        #status-bar { padding: 10px; font-size: 13px; background: #222; color: #fff; text-align: center; font-weight: bold; }
-        #error-log { color: #ff5252; font-size: 11px; padding: 5px; display: none; background: #fff1f1; border-top: 1px solid #ff5252; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            /* 2. iOS/Safariへの配慮: ブラウザ標準動作の干渉防止 */
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
 
-        /* 2. 操作・入力エリア */
-        #control-section { padding: 15px; border-bottom: 1px solid #ddd; }
-        .input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .input-row label { width: 80px; font-size: 12px; color: #666; }
-        input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
-        
-        .main-btn { width: 100%; padding: 15px; font-size: 16px; border: none; border-radius: 8px; color: white; background: var(--primary-color); font-weight: bold; margin-top: 5px; }
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+        }
 
-        /* 3. 在庫リスト */
-        #list-section { flex: 1; overflow-y: auto; padding: 10px; background: #fdfdfd; }
-        .item-card { background: #fff; padding: 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 5px solid var(--primary-color); }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 読み取りエリアの強調方法を「暗さ」から「枠線と光」に変更 */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 150px, var(--overlay-color) 155px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .scanner-frame {
+            width: 280px;
+            height: 280px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 0 0 5000px var(--overlay-color); /* 周囲を覆うが透過度は低い */
+        }
+
+        /* 四隅のガイドを強調 */
+        .scanner-frame::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            border: 3px solid var(--accent-color);
+            border-radius: 12px;
+            clip-path: polygon(0 0, 30% 0, 30% 10%, 70% 10%, 70% 0, 100% 0, 100% 30%, 90% 30%, 90% 70%, 100% 70%, 100% 100%, 70% 100%, 70% 90%, 30% 90%, 30% 100%, 0 100%, 0 70%, 10% 70%, 10% 30%, 0 30%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        button {
+            background: var(--ui-element-bg);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            /* iOSでのタップ反応向上 */
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active {
+            background: #444;
+            transform: scale(0.95);
+        }
+
+        #result {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(42, 42, 42, 0.9);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            max-width: 80%;
+            text-align: center;
+            border: 1px solid var(--accent-color);
+        }
     </style>
 </head>
 <body>
 
-<div id="app-container">
-    <div id="status-bar">自動スキャン待機中...</div>
-    <div id="error-log"></div>
-
-    <div id="camera-section">
-        <div id="interactive" class="viewport"></div>
-        <div class="scan-guide"></div>
+<div id="video-container">
+    <video id="preview" playsinline></video>
+    <div class="overlay">
+        <div class="scanner-frame"></div>
     </div>
-
-    <div id="control-section">
-        <div class="input-row">
-            <label>バーコード</label>
-            <input type="text" id="p-name" placeholder="自動入力されます">
-        </div>
-        <div class="input-row">
-            <label>賞味期限</label>
-            <input type="text" id="p-expiry" placeholder="自動検出中...">
-        </div>
-        <button class="main-btn" onclick="saveItem()">冷蔵庫に保存</button>
-    </div>
-
-    <div id="list-section">
-        <div id="inventory"></div>
+    <div id="result">QRコードをスキャンしてください</div>
+    <div class="controls">
+        <button id="switchBtn">カメラ切替</button>
+        <button id="torchBtn">ライト</button>
     </div>
 </div>
 
 <script>
-    const statusBox = document.getElementById('status-bar');
-    const pName = document.getElementById('p-name');
-    const pExpiry = document.getElementById('p-expiry');
-    let worker = null;
-    let isOCRRunning = false;
-    let lastBarcode = "";
+    // バージョン管理: v1.0.1
+    const VERSION = "1.0.1";
+    console.log(`Application Version: ${VERSION}`);
 
-    function log(msg, color = "#fff") {
-        statusBox.innerText = msg;
-        statusBox.style.color = color;
-        console.log(`[v1.0.4] ${msg}`);
+    const video = document.getElementById('preview');
+    const resultDiv = document.getElementById('result');
+
+    // 2. エラーログの具体的な出力設定
+    function logError(error, context) {
+        console.error(`[${context}] Error:`, {
+            message: error.message,
+            name: error.name,
+            stack: error.stack
+        });
+        // ユーザーにも簡易通知（デバッグ用）
+        if (error.name === 'NotAllowedError') {
+            resultDiv.innerText = "カメラの権限を許可してください";
+        } else if (error.name === 'NotFoundError') {
+            resultDiv.innerText = "カメラが見つかりません (404相当)";
+        }
     }
 
-    // 1. OCRエンジン準備
-    async function initOCR() {
-        log("OCR準備中...");
+    async function initCamera() {
         try {
-            worker = await Tesseract.createWorker('eng', 1, {
-                logger: m => { if (m.status === 'recognizing text') console.log(`OCR: ${Math.floor(m.progress * 100)}%`); }
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" } 
             });
-            log("システム準備完了。カメラを向けてください。");
-            startAutoScan();
-        } catch (e) {
-            log("起動失敗: " + e.message, "#ff5252");
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                video.play().catch(e => logError(e, "video.play"));
+            };
+        } catch (err) {
+            logError(err, "initCamera");
         }
     }
 
-    // 2. カメラ & バーコード開始
-    function startAutoScan() {
-        Quagga.init({
-            inputStream: {
-                type: "LiveStream",
-                target: document.querySelector('#interactive'),
-                constraints: { facingMode: "environment" }
-            },
-            decoder: { readers: ["ean_reader", "ean_8_reader"] }
-        }, (err) => {
-            if (err) { log("カメラ起動不可: " + err.name, "#ff5252"); return; }
-            Quagga.start();
-            // 3秒おきにOCRを自動実行するループを開始
-            setInterval(autoOCR, 3000);
-        });
+    // 初回実行
+    initCamera();
 
-        Quagga.onDetected((res) => {
-            const code = res.codeResult.code;
-            if (code !== lastBarcode) {
-                pName.value = code;
-                lastBarcode = code;
-                log("バーコード検出: " + code, "#4CAF50");
-                // 検出時バイブレーション（可能なら）
-                if (navigator.vibrate) navigator.vibrate(50);
-            }
-        });
-    }
-
-    // 3. 自動日付スキャン (OCR)
-    async function autoOCR() {
-        if (isOCRRunning || !worker) return;
-        const video = document.querySelector('video');
-        if (!video || video.readyState !== 4) return;
-
-        isOCRRunning = true;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // 枠内のみクロップ
-        const scale = video.videoWidth / video.clientWidth;
-        const cropW = (video.clientWidth * 0.8) * scale;
-        const cropH = (video.clientHeight * 0.4) * scale;
-        const cropX = (video.videoWidth - cropW) / 2;
-        const cropY = (video.videoHeight - cropH) / 2;
-
-        canvas.width = cropW;
-        canvas.height = cropH;
-        ctx.filter = 'grayscale(1) contrast(2)';
-        ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-        try {
-            const { data: { text } } = await worker.recognize(canvas);
-            const match = text.match(/\d{2,4}[./-]\d{1,2}[./-]\d{1,2}/);
-            if (match) {
-                pExpiry.value = match[0];
-                log("日付検出: " + match[0], "#4CAF50");
-            }
-        } catch (e) {
-            console.error("OCR Auto Error:", e);
-        } finally {
-            isOCRRunning = false;
+    // iOS/Safariのダブルタップズーム防止（標準動作対策）
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 1) {
+            e.preventDefault();
         }
-    }
-
-    // 4. 保存
-    function saveItem() {
-        if (!pName.value) { alert("商品コードが必要です"); return; }
-        const card = document.createElement('div');
-        card.className = 'item-card';
-        card.innerHTML = `<strong>${pName.value}</strong><br><small>期限: ${pExpiry.value || '未設定'}</small>`;
-        document.getElementById('inventory').prepend(card);
-        
-        // 入力クリア
-        pName.value = ""; pExpiry.value = ""; lastBarcode = "";
-        log("保存しました");
-    }
-
-    window.onload = initOCR;
+    }, { passive: false });
 </script>
+
 </body>
 </html>
