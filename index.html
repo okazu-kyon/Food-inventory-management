@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.1.3</title>
+    <title>Food Manager v1.2.0</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
@@ -22,84 +24,43 @@
             touch-action: none; -webkit-user-select: none;
         }
 
-        #main-container {
-            display: flex; flex-direction: column; width: 100%; height: 100vh;
-        }
+        #main-container { display: flex; flex-direction: column; width: 100%; height: 100vh; }
 
-        /* 上部：カメラエリア（40%に縮小） */
-        #camera-section {
-            height: 40%; position: relative; background: #000; overflow: hidden;
-        }
+        /* 上部：カメラエリア（40%） */
+        #camera-section { height: 40%; position: relative; background: #000; overflow: hidden; }
         video { width: 100%; height: 100%; object-fit: cover; }
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; pointer-events: none; }
+        .guide-box { width: 75%; height: 70px; border: 2px solid #fff; border-radius: 8px; box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5); }
 
-        .overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: center;
-            pointer-events: none;
-        }
-        .guide-box {
-            width: 75%; height: 70px; border: 2px solid #fff; border-radius: 8px;
-            box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
-        }
+        #top-bar { position: absolute; top: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; box-sizing: border-box; z-index: 30; background: rgba(0,0,0,0.4); }
+        .btn-reload { background: #444; color: #fff; border: 1px solid #666; padding: 4px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; }
 
-        /* ヘッダー/ステータス */
-        #top-bar {
-            position: absolute; top: 0; width: 100%; display: flex; 
-            justify-content: space-between; align-items: center;
-            padding: 8px 12px; box-sizing: border-box; z-index: 30;
-            background: rgba(0,0,0,0.4);
-        }
-        .btn-reload {
-            background: #444; color: #fff; border: 1px solid #666; 
-            padding: 4px 12px; border-radius: 4px; font-size: 13px; font-weight: bold;
-        }
-
-        /* 下部：操作パネル（上方にシフト） */
-        #panel-section {
-            flex: 1; background: var(--panel-bg); padding: 10px 15px;
-            border-top: 1px solid #333; z-index: 20;
-            display: flex; flex-direction: column; gap: 8px;
-        }
-
+        /* 下部：操作パネル */
+        #panel-section { flex: 1; background: var(--panel-bg); padding: 10px 15px; border-top: 1px solid #333; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
         .ver-badge { font-size: 9px; color: #555; text-align: right; margin-top: -5px; }
 
         .input-row { display: flex; align-items: stretch; gap: 8px; }
         .input-group { flex: 1; display: flex; flex-direction: column; }
         .input-group label { font-size: 10px; color: #888; margin-bottom: 2px; }
-        input { 
-            width: 100%; background: #000; border: 1px solid #444; color: #fff; 
-            padding: 10px; border-radius: 6px; box-sizing: border-box; font-size: 16px;
-        }
+        input { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
 
-        .btn-action {
-            width: 80px; border-radius: 6px; border: none; font-size: 12px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .btn-action { width: 80px; border-radius: 6px; border: none; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
         .btn-name { background: var(--name-color); color: #000; }
         .btn-date { background: var(--accent-color); color: #000; }
 
-        .btn-save {
-            background: #fff; color: #000; border: none; padding: 12px;
-            border-radius: 25px; font-size: 16px; font-weight: bold; width: 100%;
-            margin-top: 5px;
-        }
-
-        #status-bar {
-            background: rgba(0,0,0,0.7); color: #0f0; font-size: 11px;
-            padding: 4px; text-align: center; border-radius: 4px;
-        }
+        .btn-save { background: #fff; color: #000; border: none; padding: 12px; border-radius: 25px; font-size: 16px; font-weight: bold; width: 100%; margin-top: 5px; }
+        #status-bar { background: rgba(0,0,0,0.7); color: #0f0; font-size: 11px; padding: 4px; text-align: center; border-radius: 4px; }
 
         .controls-extra { display: flex; justify-content: space-between; margin-top: 5px; }
         .btn-sub { font-size: 12px; color: #aaa; background: #333; border: none; padding: 8px 20px; border-radius: 15px; }
 
         /* 履歴 */
-        #history-panel {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100; display: none; padding: 20px; box-sizing: border-box; overflow-y: auto;
-        }
-        .history-item { border-bottom: 1px solid #222; padding: 12px 0; }
+        #history-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; display: none; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+        .history-item { border-bottom: 1px solid #222; padding: 12px 0; display: flex; justify-content: space-between; align-items: center; }
+        .h-content { flex: 1; }
         .h-name { color: var(--name-color); font-weight: bold; }
-        .h-days { float: right; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+        .h-days { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+        .btn-del { background: #333; color: #888; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 18px; margin-left: 10px; }
 
         canvas { display: none; }
     </style>
@@ -109,7 +70,7 @@
 <div id="main-container">
     <div id="camera-section">
         <div id="top-bar">
-            <span style="font-size: 10px; color: #888;">Food Manager</span>
+            <span style="font-size: 10px; color: #888;">Food Manager 家族共有版</span>
             <button class="btn-reload" onclick="location.reload()">更新</button>
         </div>
         <video id="camera-view" playsinline autoplay muted></video>
@@ -119,7 +80,7 @@
     </div>
 
     <div id="panel-section">
-        <div id="status-bar">カメラ準備中...</div>
+        <div id="status-bar">Firebase接続中...</div>
         
         <div class="input-row">
             <div class="input-group">
@@ -137,27 +98,40 @@
             <button id="scan-date-btn" class="btn-action btn-date">日付読取</button>
         </div>
 
-        <button id="save-btn" class="btn-save">リストに保存</button>
+        <button id="save-btn" class="btn-save">クラウドに保存</button>
 
         <div class="controls-extra">
-            <button id="toggle-history" class="btn-sub">履歴を表示</button>
-            <div class="ver-badge">v1.1.3</div>
+            <button id="toggle-history" class="btn-sub">共有リストを表示</button>
+            <div class="ver-badge">v1.2.0</div>
         </div>
     </div>
 
     <div id="history-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <span style="font-weight:bold; font-size:18px;">保存済み (期限順)</span>
+            <span style="font-weight:bold; font-size:18px;">家族の共有リスト</span>
             <button onclick="toggleHistory()" style="background:#333; color:#fff; border:none; border-radius:50%; width:35px; height:35px;">×</button>
         </div>
         <div id="history-list"></div>
-        <button onclick="clearHistory()" style="width:100%; margin-top:30px; padding:12px; background:#400; color:#f66; border:none; border-radius:8px;">全削除</button>
     </div>
 </div>
 
 <canvas id="canvas-temp"></canvas>
 
 <script>
+    // --- Firebase設定 ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyAIy_4IGs-HXp_Yn7cX1Lt6_WjCSrCncQY",
+        authDomain: "okazu-food-manager.firebaseapp.com",
+        databaseURL: "https://okazu-food-manager-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "okazu-food-manager",
+        storageBucket: "okazu-food-manager.appspot.com",
+        messagingSenderId: "364539829288",
+        appId: "1:364539829288:web:7852c79f47053073ec313e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref('food_items');
+
     const video = document.getElementById('camera-view');
     const inputName = document.getElementById('input-name');
     const inputDate = document.getElementById('input-date');
@@ -166,119 +140,59 @@
     
     let videoTrack = null;
     let currentZoom = 1.0;
-    let initialPinchDistance = null;
     let worker = null;
 
-    // iOS ズームバグ徹底ガード
-    document.addEventListener('touchstart', (e) => { if (e.touches.length > 1) return; }, { passive: false });
-    let lastTouchTime = 0;
-    document.addEventListener('touchend', (e) => {
-        const now = Date.now();
-        if (now - lastTouchTime < 300) e.preventDefault();
-        lastTouchTime = now;
-    }, { passive: false });
-
-    async function initOCR() {
-        if (worker) return;
-        statusBar.innerText = "OCR準備中...";
-        try {
-            worker = await Tesseract.createWorker(['jpn', 'eng']);
-            statusBar.innerText = "Ready";
-        } catch(e) {
-            statusBar.innerText = "OCRエラー: " + e.message;
-        }
-    }
-
+    // カメラ・OCR・ズーム制御 (v1.1.3継承)
     async function startCamera() {
-        statusBar.innerText = "カメラを起動しています...";
-        if (video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-        }
-        
+        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
-            });
-            video.srcObject = stream;
-            videoTrack = stream.getVideoTracks()[0];
-            video.onloadedmetadata = () => {
-                video.play();
-                applyZoom(1.5);
-                statusBar.innerText = "Ready (ピンチでズーム)";
-            };
-        } catch (err) {
-            let msg = "起動失敗";
-            if (err.name === 'NotAllowedError') msg = "カメラ許可が必要です";
-            else if (err.name === 'NotFoundError') msg = "カメラが見つかりません";
-            statusBar.innerText = "カメラエラー: " + msg;
-            console.error("Camera Error Log:", err);
-        }
+            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+            video.srcObject = s;
+            videoTrack = s.getVideoTracks()[0];
+            video.onloadedmetadata = () => { video.play(); applyZoom(1.5); statusBar.innerText = "Ready (家族共有中)"; };
+        } catch (e) { statusBar.innerText = "カメラエラー"; console.error(e); }
     }
 
-    async function applyZoom(val) {
+    async function applyZoom(v) {
         if (!videoTrack) return;
         try {
             const cap = videoTrack.getCapabilities();
             if (cap.zoom) {
-                currentZoom = Math.max(cap.zoom.min, Math.min(val, cap.zoom.max));
+                currentZoom = Math.max(cap.zoom.min, Math.min(v, cap.zoom.max));
                 await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
             }
-        } catch(e) { console.log("Zoom not supported"); }
+        } catch(e) {}
     }
 
-    // ピンチズーム
-    document.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-    }, { passive: false });
-    document.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && initialPinchDistance) {
-            e.preventDefault();
-            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            applyZoom(currentZoom + (dist - initialPinchDistance) / 100);
-            initialPinchDistance = dist;
-        }
-    }, { passive: false });
-
     async function scan(type) {
-        if (!worker) await initOCR();
+        if (!worker) worker = await Tesseract.createWorker(['jpn', 'eng']);
         statusBar.innerText = "解析中...";
         const rect = document.getElementById('main-guide').getBoundingClientRect();
         const sx = video.videoWidth / video.clientWidth;
         const sy = video.videoHeight / video.clientHeight;
-
-        canvas.width = rect.width * sx;
-        canvas.height = rect.height * sy;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, rect.left * sx, rect.top * sy, rect.width * sx, rect.height * sy, 0, 0, canvas.width, canvas.height);
-
+        canvas.width = rect.width * sx; canvas.height = rect.height * sy;
+        canvas.getContext('2d').drawImage(video, rect.left*sx, rect.top*sy, rect.width*sx, rect.height*sy, 0, 0, canvas.width, canvas.height);
         try {
             const { data: { text } } = await worker.recognize(canvas);
-            if (type === 'name') {
-                inputName.value = text.trim().replace(/\s+/g, ' ');
-            } else {
-                const pattern = /(\d{2,4}[\.\/\-\s]+\d{1,2}[\.\/\-\s]+\d{1,2})|(\d{6,8})|(\d{2,4}年\d{1,2}月\d{1,2}日)/g;
-                const m = text.match(pattern);
-                inputDate.value = m ? m[0] : text.trim();
-            }
+            if (type === 'name') inputName.value = text.trim();
+            else inputDate.value = (text.match(/(\d{2,4}[\.\/\-\s年]+\d{1,2}[\.\/\-\s月]+\d{1,2})/g) || [text.trim()])[0];
             statusBar.innerText = "読取完了";
-        } catch (e) {
-            statusBar.innerText = "解析失敗";
-        }
+        } catch (e) { statusBar.innerText = "解析失敗"; }
     }
 
+    // Firebase保存
     document.getElementById('save-btn').addEventListener('click', () => {
-        if (!inputName.value || !inputDate.value) return alert("未入力項目があります");
-        const item = { 
-            name: inputName.value, 
-            date: inputDate.value, 
-            reg: new Date().toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+        if (!inputName.value || !inputDate.value) return alert("未入力があります");
+        const newItem = {
+            name: inputName.value,
+            date: inputDate.value,
+            reg: new Date().toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+            timestamp: Date.now()
         };
-        const history = JSON.parse(localStorage.getItem('food_manager_v1') || '[]');
-        history.unshift(item);
-        localStorage.setItem('food_manager_v1', JSON.stringify(history));
-        statusBar.innerText = "保存しました";
-        inputName.value = ""; inputDate.value = "";
+        db.push(newItem).then(() => {
+            statusBar.innerText = "クラウドに保存しました";
+            inputName.value = ""; inputDate.value = "";
+        }).catch(e => console.error("Firebase Save Error:", e));
     });
 
     function parseDate(str) {
@@ -290,37 +204,41 @@
         return new Date(y, m, day);
     }
 
+    // 履歴表示（リアルタイム同期）
     function toggleHistory() {
         const panel = document.getElementById('history-panel');
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        if (panel.style.display === 'block') {
-            const list = JSON.parse(localStorage.getItem('food_manager_v1') || '[]');
-            const today = new Date(); today.setHours(0,0,0,0);
-            list.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-
-            document.getElementById('history-list').innerHTML = list.map(h => {
-                const targetDate = parseDate(h.date);
-                const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
-                const dayText = diffDays === 0 ? "今日！" : (diffDays > 0 ? `あと${diffDays}日` : `${Math.abs(diffDays)}日切過`);
-                const color = diffDays <= 3 ? "#ff4444" : "#00ff00";
-
-                return `
-                    <div class="history-item">
-                        <div style="margin-bottom:4px;"><span class="h-name">${h.name}</span><span class="h-days" style="background:${color}; color:#000;">${dayText}</span></div>
-                        <div style="font-size:12px; color:#aaa;">期限: ${h.date} <span style="font-size:9px; margin-left:10px; color:#444;">(${h.reg}登録)</span></div>
-                    </div>
-                `;
-            }).join('');
-        }
     }
 
-    function clearHistory() { if(confirm("全削除しますか？")) { localStorage.removeItem('food_manager_v1'); toggleHistory(); } }
+    db.on('value', (snapshot) => {
+        const data = snapshot.val();
+        const listItems = [];
+        for (let id in data) { listItems.push({ id, ...data[id] }); }
+        
+        const today = new Date(); today.setHours(0,0,0,0);
+        listItems.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+
+        document.getElementById('history-list').innerHTML = listItems.map(h => {
+            const diffDays = Math.ceil((parseDate(h.date) - today) / (86400000));
+            const color = diffDays <= 3 ? "#ff4444" : "#00ff00";
+            return `
+                <div class="history-item">
+                    <div class="h-content">
+                        <div><span class="h-name">${h.name}</span><span class="h-days" style="background:${color}; color:#000;">あと${diffDays}日</span></div>
+                        <div style="font-size:12px; color:#aaa;">期限: ${h.date} <span style="font-size:9px; color:#444;">(${h.reg}登録)</span></div>
+                    </div>
+                    <button class="btn-del" onclick="deleteItem('${h.id}')">×</button>
+                </div>
+            `;
+        }).join('');
+    });
+
+    window.deleteItem = (id) => { if(confirm("削除しますか？")) db.child(id).remove(); };
 
     document.getElementById('scan-name-btn').addEventListener('click', () => scan('name'));
     document.getElementById('scan-date-btn').addEventListener('click', () => scan('date'));
     document.getElementById('toggle-history').addEventListener('click', toggleHistory);
-    window.addEventListener('load', () => { startCamera(); initOCR(); });
+    window.addEventListener('load', startCamera);
 </script>
-
 </body>
 </html>
