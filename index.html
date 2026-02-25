@@ -3,278 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>冷蔵庫管理 v1.0.0</title>
+    <title>冷蔵庫管理 v1.0.2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        /* レイアウト固定設定 */
-        :root {
-            --primary-color: #4CAF50;
-            --bg-color: #f4f4f4;
+        :root { --primary-color: #4CAF50; --accent-color: #ff5252; --bg-color: #f4f4f4; }
+        body { margin: 0; padding: 0; font-family: sans-serif; background-color: var(--bg-color); touch-action: manipulation; overflow: hidden; }
+        #app-container { display: flex; flex-direction: column; height: 100vh; max-width: 600px; margin: 0 auto; background: #fff; }
+        
+        /* 1. カメラエリア (ガイド枠をより鮮明に) */
+        #camera-section { position: relative; width: 100%; height: 40vh; background: #000; }
+        #interactive.viewport { width: 100%; height: 100%; }
+        #interactive.viewport video { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* 日付読み取り専用の狭いターゲット枠 */
+        .scan-guide { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            width: 70%; height: 30%; border: 3px solid var(--accent-color); 
+            box-shadow: 0 0 0 4000px rgba(0,0,0,0.5); z-index: 10; pointer-events: none; 
+        }
+        .scan-guide::after {
+            content: "ここに日付を合わせてください"; color: white; position: absolute; top: -25px; left: 0; font-size: 12px; width: 100%; text-align: center;
         }
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            /* iOSズーム防止 */
-            touch-action: manipulation;
-            overflow-x: hidden;
-        }
+        #status-bar { padding: 8px; font-size: 12px; background: #333; color: #fff; text-align: center; }
 
-        #app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            max-width: 600px;
-            margin: 0 auto;
-            background: #fff;
-        }
+        /* 2. 操作エリア */
+        #control-section { padding: 15px; border-bottom: 1px solid #ddd; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 10px; }
+        button { flex: 1; padding: 12px; font-size: 14px; border: none; border-radius: 8px; color: white; background: var(--primary-color); font-weight: bold; }
+        input { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        
+        /* プレビュー用隠しキャンバス（デバッグ用） */
+        #debug-canvas { display: none; width: 100%; height: auto; border: 1px solid #000; }
 
-        /* 1. カメラエリア (上部固定) */
-        #camera-section {
-            position: relative;
-            width: 100%;
-            height: 40vh;
-            background: #000;
-            overflow: hidden;
-        }
-
-        #interactive.viewport {
-            width: 100%;
-            height: 100%;
-        }
-
-        #interactive.viewport video, canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* スキャンガイド枠 */
-        .scan-guide {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            height: 60%;
-            border: 2px solid var(--primary-color);
-            box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.3);
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        /* 2. 操作エリア (中央) */
-        #control-section {
-            padding: 15px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        button {
-            flex: 1;
-            padding: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            background-color: var(--primary-color);
-            cursor: pointer;
-            touch-action: manipulation;
-        }
-
-        button:active {
-            opacity: 0.7;
-        }
-
-        .input-group {
-            margin-bottom: 10px;
-        }
-
-        label {
-            display: block;
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 4px;
-        }
-
-        input {
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 18px;
-        }
-
-        /* 3. 在庫リストエリア (下部) */
-        #list-section {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-        }
-
-        .item-card {
-            background: #f9f9f9;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            border-left: 5px solid var(--primary-color);
-        }
-
-        #status-log {
-            font-size: 11px;
-            color: #888;
-            padding: 5px;
-            background: #eee;
-        }
+        #list-section { flex: 1; overflow-y: auto; padding: 10px; background: #eee; }
+        .item-card { background: #fff; padding: 10px; margin-bottom: 8px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid var(--primary-color); }
     </style>
 </head>
 <body>
 
-<div id-app-container>
+<div id="app-container">
+    <div id="status-bar">v1.0.2: 準備完了</div>
     <div id="camera-section">
         <div id="interactive" class="viewport"></div>
         <div class="scan-guide"></div>
     </div>
 
-    <div id="status-log">Status: 待機中...</div>
-
     <div id="control-section">
         <div class="btn-group">
-            <button onclick="startBarcodeScan()">バーコード</button>
-            <button onclick="captureForOCR()">賞味期限読込</button>
+            <button onclick="startScan()">バーコード</button>
+            <button onclick="processOCR()" style="background:#E91E63">賞味期限を抽出</button>
         </div>
-        <div class="input-group">
-            <label>バーコード / 商品名</label>
-            <input type="text" id="product-code" placeholder="スキャンまたは入力">
-        </div>
-        <div class="input-group">
-            <label>賞味期限</label>
-            <input type="text" id="expiry-date" placeholder="YYYY-MM-DD">
-        </div>
-        <button onclick="saveItem()" style="background: #2196F3; width: 100%;">冷蔵庫に入れる</button>
+        <input type="text" id="p-name" placeholder="商品名またはコード">
+        <input type="text" id="p-expiry" placeholder="賞味期限 (自動抽出されます)">
+        <button onclick="saveItem()" style="background:#2196F3; width:100%">冷蔵庫に保存</button>
     </div>
 
+    <canvas id="debug-canvas"></canvas>
+
     <div id="list-section">
-        <h3 style="margin-top: 0;">在庫リスト</h3>
-        <div id="inventory-list"></div>
+        <div id="inventory"></div>
     </div>
 </div>
 
 <script>
-    const logElement = document.getElementById('status-log');
-    const productInput = document.getElementById('product-code');
-    const expiryInput = document.getElementById('expiry-date');
+    const statusBox = document.getElementById('status-bar');
+    const pName = document.getElementById('p-name');
+    const pExpiry = document.getElementById('p-expiry');
 
-    function updateLog(msg, isError = false) {
-        logElement.innerText = `Status: ${msg}`;
-        if (isError) console.error(`[App Error] ${msg}`);
-        else console.log(`[App Info] ${msg}`);
+    function updateStatus(msg) {
+        statusBox.innerText = msg;
+        console.log("[v1.0.2]", msg);
     }
 
-    // --- バーコードスキャン (QuaggaJS) ---
-    function startBarcodeScan() {
-        updateLog("バーコードスキャナ起動中...");
+    // カメラ起動
+    function startScan() {
+        updateStatus("カメラ初期化中...");
         Quagga.init({
             inputStream: {
-                name: "Live",
                 type: "LiveStream",
                 target: document.querySelector('#interactive'),
-                constraints: {
-                    facingMode: "environment"
-                }
+                constraints: { facingMode: "environment" }
             },
-            decoder: {
-                readers: ["ean_reader", "ean_8_reader"]
-            }
-        }, function(err) {
-            if (err) {
-                updateLog(`起動失敗: ${err.name}`, true);
-                return;
-            }
+            decoder: { readers: ["ean_reader"] }
+        }, (err) => {
+            if (err) { updateStatus("カメラ起動エラー: " + err.name); return; }
             Quagga.start();
-            updateLog("バーコード読み取り中...");
+            updateStatus("バーコード読み取り中...");
         });
 
-        Quagga.onDetected((data) => {
-            productInput.value = data.codeResult.code;
-            updateLog("バーコード検出成功！");
-            Quagga.stop();
+        Quagga.onDetected((res) => {
+            pName.value = res.codeResult.code;
+            updateStatus("バーコード読取完了");
         });
     }
 
-    // --- 賞味期限読込 (Tesseract.js OCR) ---
-    async function captureForOCR() {
-        updateLog("画像解析中 (Tesseract)...");
-        
+    // OCR処理：枠内のみをクロップして解析
+    async function processOCR() {
         const video = document.querySelector('video');
-        if (!video) {
-            updateLog("カメラが起動していません。バーコードボタンを先に押してください。", true);
-            return;
-        }
+        if (!video) { updateStatus("先にカメラを起動してください"); return; }
 
+        updateStatus("画像をキャプチャ中...");
+        
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+        const ctx = canvas.getContext('2d');
+        
+        // ビデオの現在の解像度を取得
+        const vW = video.videoWidth;
+        const vH = video.videoHeight;
+        
+        // ガイド枠（70% x 30%）に対応する領域を計算
+        const cropW = vW * 0.7;
+        const cropH = vH * 0.3;
+        const cropX = (vW - cropW) / 2;
+        const cropY = (vH - cropH) / 2;
 
+        canvas.width = cropW;
+        canvas.height = cropH;
+
+        // 枠内だけを切り抜き、かつ白黒に加工
+        ctx.filter = 'grayscale(100%) contrast(150%)';
+        ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+        updateStatus("文字を解析しています...");
         try {
-            const result = await Tesseract.recognize(canvas, 'eng', {
-                logger: m => console.log(m)
-            });
-            // 数字と日付記号っぽいものを抽出
-            const dateMatch = result.data.text.match(/\d{2,4}[./-]\d{1,2}[./-]\d{1,2}/);
+            const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
+            updateStatus("解析成功");
+            
+            // 日付らしいパターン (202x/xx/xx や xx-xx-xx 等) を探す
+            const dateMatch = text.match(/\d{2,4}[./-]\d{1,2}[./-]\d{1,2}/);
             if (dateMatch) {
-                expiryInput.value = dateMatch[0];
-                updateLog("日付を抽出しました");
+                pExpiry.value = dateMatch[0].replace(/[.\/]/g, '-');
             } else {
-                expiryInput.value = result.data.text.substring(0, 10); // 候補として一部表示
-                updateLog("日付が見つかりませんでした。テキストを抽出します。");
+                // 日付が見つからない場合は生データを短くして入れる（確認用）
+                pExpiry.value = text.replace(/[^0-9.\/-]/g, '').substring(0, 10);
+                updateStatus("日付を特定できませんでした");
             }
         } catch (e) {
-            updateLog(`OCRエラー: ${e.message}`, true);
+            updateStatus("解析エラー: " + e.message);
         }
     }
 
-    // --- 保存機能 ---
     function saveItem() {
-        const item = {
-            code: productInput.value,
-            expiry: expiryInput.value,
-            date: new Date().toLocaleString()
-        };
-        
-        if(!item.code) {
-            alert("商品名またはコードを入力してください");
-            return;
-        }
-
-        const list = document.getElementById('inventory-list');
-        const card = document.createElement('div');
-        card.className = 'item-card';
-        card.innerHTML = `<strong>${item.code}</strong><br>期限: ${item.expiry}<br><small>登録: ${item.date}</small>`;
-        list.prepend(card);
-        
-        // 入力クリア
-        productInput.value = "";
-        expiryInput.value = "";
-        updateLog("保存しました");
+        if (!pName.value) return;
+        const item = document.createElement('div');
+        item.className = 'item-card';
+        item.innerHTML = `<strong>${pName.value}</strong><br><small>期限: ${pExpiry.value || '未設定'}</small>`;
+        document.getElementById('inventory').prepend(item);
+        pName.value = ""; pExpiry.value = "";
+        updateStatus("保存しました");
     }
-
-    // 初期化時にカメラパーミッション確認用ダミー
-    window.onload = () => {
-        updateLog("ライブラリロード完了。スキャンを開始してください。");
-    };
 </script>
-
 </body>
 </html>
