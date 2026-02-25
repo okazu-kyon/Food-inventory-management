@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Scanner v1.0.1</title>
+    <title>Date Reader Test v1.0.2</title>
     <style>
-        /* 1. デザイン・レイアウトの固定: 既存の配置を維持 */
+        /* 1. デザイン・レイアウトの固定: 既存の配置を維持しつつ配色のみ修正 */
         :root {
-            /* 配色の修正: 真っ黒を避け、視認性の高いダークグレーを採用 */
-            --bg-color: #121212;
-            --overlay-color: rgba(18, 18, 18, 0.65); /* 透過度を下げて周囲を見やすく */
-            --accent-color: #00ff41;
-            --ui-element-bg: #2a2a2a;
+            /* 「黒すぎ」を解消する明るめのダークグレー */
+            --bg-color: #222222;
+            --overlay-color: rgba(0, 0, 0, 0.3); /* 透過度を30%まで下げて周囲を明るく */
+            --guide-color: #ffffff; /* 数字を見やすくするための白い枠 */
+            --accent-color: #00ff00;
             --text-color: #ffffff;
         }
 
@@ -22,22 +22,21 @@
             height: 100%;
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, sans-serif;
             overflow: hidden;
-            /* 2. iOS/Safariへの配慮: ブラウザ標準動作の干渉防止 */
+            /* 2. iOS/Safariへの配慮: ズーム等の干渉防止 */
             touch-action: none;
             -webkit-user-select: none;
-            user-select: none;
         }
 
         #video-container {
             position: relative;
             width: 100%;
             height: 100vh;
+            background: #000;
             display: flex;
             justify-content: center;
             align-items: center;
-            background: #000;
         }
 
         video {
@@ -46,149 +45,148 @@
             object-fit: cover;
         }
 
-        /* 読み取りエリアの強調方法を「暗さ」から「枠線と光」に変更 */
+        /* 読み取りエリアの改善: 「日付」を捉えやすい横長のガイド */
         .overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: radial-gradient(circle, transparent 150px, var(--overlay-color) 155px);
+            background: rgba(0, 0, 0, 0.2); /* 全体的に明るく */
             display: flex;
             justify-content: center;
             align-items: center;
             pointer-events: none;
         }
 
-        .scanner-frame {
-            width: 280px;
-            height: 280px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 12px;
+        .guide-box {
+            width: 80%;
+            height: 120px; /* 日付・数字用に横長に設定 */
+            border: 2px solid var(--guide-color);
+            border-radius: 8px;
+            box-shadow: 0 0 0 5000px var(--overlay-color), inset 0 0 15px rgba(255,255,255,0.2);
             position: relative;
-            box-shadow: 0 0 0 5000px var(--overlay-color); /* 周囲を覆うが透過度は低い */
         }
 
-        /* 四隅のガイドを強調 */
-        .scanner-frame::before {
+        /* 4角の強調（数字へのピント合わせを補助） */
+        .guide-box::before {
             content: '';
             position: absolute;
-            top: -2px; left: -2px; right: -2px; bottom: -2px;
-            border: 3px solid var(--accent-color);
-            border-radius: 12px;
-            clip-path: polygon(0 0, 30% 0, 30% 10%, 70% 10%, 70% 0, 100% 0, 100% 30%, 90% 30%, 90% 70%, 100% 70%, 100% 100%, 70% 100%, 70% 90%, 30% 90%, 30% 100%, 0 100%, 0 70%, 10% 70%, 10% 30%, 0 30%);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            top: -5px; left: -5px; right: -5px; bottom: -5px;
+            border: 4px solid var(--accent-color);
+            clip-path: polygon(0 0, 20px 0, 20px 4px, 4px 4px, 4px 20px, 0 20px, 
+                               100% 0, calc(100% - 20px) 0, calc(100% - 20px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 20px, 100% 20px,
+                               100% 100%, calc(100% - 20px) 100%, calc(100% - 20px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 20px), 100% calc(100% - 20px),
+                               0 100%, 20px 100%, 20px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 20px), 0 calc(100% - 20px));
         }
 
         .controls {
             position: absolute;
-            bottom: 40px;
+            bottom: 50px;
             width: 100%;
             display: flex;
-            justify-content: space-around;
-            padding: 0 20px;
-            box-sizing: border-box;
+            justify-content: center;
             z-index: 10;
         }
 
         button {
-            background: var(--ui-element-bg);
+            background: rgba(60, 60, 60, 0.8);
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 12px 24px;
-            border-radius: 25px;
+            border: 1px solid #fff;
+            padding: 15px 30px;
+            border-radius: 30px;
             font-size: 16px;
-            font-weight: bold;
-            /* iOSでのタップ反応向上 */
+            /* iOS用タップ対策 */
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
         }
 
-        button:active {
-            background: #444;
-            transform: scale(0.95);
-        }
-
-        #result {
+        #status-display {
             position: absolute;
             top: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(42, 42, 42, 0.9);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            max-width: 80%;
+            width: 90%;
+            left: 5%;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
             text-align: center;
-            border: 1px solid var(--accent-color);
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 
 <div id="video-container">
-    <video id="preview" playsinline></video>
+    <video id="camera-view" playsinline autoplay muted></video>
     <div class="overlay">
-        <div class="scanner-frame"></div>
+        <div class="guide-box"></div>
     </div>
-    <div id="result">QRコードをスキャンしてください</div>
+    <div id="status-display">カメラ準備中...</div>
     <div class="controls">
-        <button id="switchBtn">カメラ切替</button>
-        <button id="torchBtn">ライト</button>
+        <button id="start-btn">カメラを起動/再開</button>
     </div>
 </div>
 
 <script>
-    // バージョン管理: v1.0.1
-    const VERSION = "1.0.1";
+    // バージョン管理: v1.0.2 (数字読み取りテスト用)
+    const VERSION = "1.0.2";
     console.log(`Application Version: ${VERSION}`);
 
-    const video = document.getElementById('preview');
-    const resultDiv = document.getElementById('result');
+    const video = document.getElementById('camera-view');
+    const status = document.getElementById('status-display');
+    const startBtn = document.getElementById('start-btn');
 
-    // 2. エラーログの具体的な出力設定
-    function logError(error, context) {
-        console.error(`[${context}] Error:`, {
-            message: error.message,
-            name: error.name,
-            stack: error.stack
-        });
-        // ユーザーにも簡易通知（デバッグ用）
-        if (error.name === 'NotAllowedError') {
-            resultDiv.innerText = "カメラの権限を許可してください";
-        } else if (error.name === 'NotFoundError') {
-            resultDiv.innerText = "カメラが見つかりません (404相当)";
-        }
+    // 2. コンソールへの具体的なエラーログ出力
+    function report(msg, detail = "") {
+        console.log(`[LOG] ${msg}`, detail);
+        status.innerText = msg;
     }
 
-    async function initCamera() {
+    async function startCamera() {
+        report("カメラアクセスをリクエスト中...");
+        
+        const constraints = {
+            video: {
+                facingMode: "environment",
+                width: { ideal: 1920 }, // 数字を読みやすくするため高解像度を要求
+                height: { ideal: 1080 }
+            },
+            audio: false
+        };
+
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" } 
-            });
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
+            
+            // トラック情報の確認（デバッグ用）
+            const track = stream.getVideoTracks()[0];
+            const settings = track.getSettings();
+            report(`起動成功: ${settings.width}x${settings.height} / ${track.label}`);
+            
             video.onloadedmetadata = () => {
-                video.play().catch(e => logError(e, "video.play"));
+                video.play().catch(e => report("再生エラー", e));
             };
         } catch (err) {
-            logError(err, "initCamera");
+            console.error("Camera Error Details:", err);
+            if (err.name === 'NotAllowedError') {
+                report("エラー: カメラの許可が拒否されました");
+            } else if (err.name === 'NotFoundError') {
+                report("エラー: カメラが見つかりません (404)");
+            } else {
+                report(`エラー: ${err.name}`, err.message);
+            }
         }
     }
 
-    // 初回実行
-    initCamera();
+    // iOSの自動再生制限対策として、ボタンクリックで開始
+    startBtn.addEventListener('click', () => {
+        startCamera();
+    });
 
-    // iOS/Safariのダブルタップズーム防止（標準動作対策）
+    // iOS/Safariのダブルタップズーム防止
     document.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 1) {
-            e.preventDefault();
-        }
+        if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
 </script>
 
