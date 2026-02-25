@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.6</title>
+    <title>Food Manager v1.4.7</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -131,7 +131,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.6</div>
+        <div class="ver-label">v1.4.7</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -187,7 +187,6 @@
 <canvas id="canvas-temp"></canvas>
 
 <script>
-    // 起動時の自動リフレッシュ（キャッシュ対策）
     (function() {
         if (!sessionStorage.getItem('reloaded')) {
             sessionStorage.setItem('reloaded', 'true');
@@ -224,7 +223,15 @@
         try {
             const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
             video.srcObject = s;
+            console.log("Camera started successfully");
         } catch (e) { console.error("Camera access failed", e); }
+    }
+
+    // カメラのフリーズを解除して再生する関数
+    function resumeCamera() {
+        if (video && video.srcObject) {
+            video.play().catch(e => console.error("Camera resume failed", e));
+        }
     }
 
     document.getElementById('shutter-btn').addEventListener('click', () => {
@@ -321,6 +328,7 @@
         if (confirm(`${checks.length}件削除しますか？`)) {
             checks.forEach(c => db.child(c.dataset.id).remove());
             document.getElementById('edit-mode-btn').click();
+            resumeCamera(); // 削除後もカメラ再開を念押し
         }
     }
 
@@ -333,7 +341,10 @@
         if (confirm('削除しますか？')) db.child(currentEditId).remove().then(() => closePanel('detail-panel'));
     });
 
-    function closePanel(id) { document.getElementById(id).style.display = 'none'; }
+    function closePanel(id) { 
+        document.getElementById(id).style.display = 'none'; 
+        resumeCamera(); // パネルを閉じたらカメラを再開
+    }
     document.getElementById('toggle-history').addEventListener('click', () => document.getElementById('history-panel').style.display = 'block');
 
     db.on('value', (snapshot) => {
