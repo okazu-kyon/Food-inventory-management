@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.1</title>
+    <title>Food Manager v1.4.2</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -22,8 +22,7 @@
             margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: var(--bg-color); color: var(--text-color);
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            overflow: hidden;
-            touch-action: none;
+            overflow: hidden; touch-action: none;
         }
 
         #main-container {
@@ -32,7 +31,6 @@
             box-sizing: border-box;
         }
 
-        /* 1. デザイン・レイアウトの固定 */
         #camera-section {
             height: 33vh; width: 100%; position: relative;
             background: #000; overflow: hidden; flex-shrink: 0;
@@ -84,7 +82,6 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.5); flex-shrink: 0;
         }
 
-        /* リスト・編集UI */
         .overlay-panel {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: none;
@@ -93,26 +90,13 @@
         }
 
         .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .history-item {
-            border-bottom: 1px solid #222; padding: 12px 0; display: flex; align-items: center;
-            gap: 12px; transition: transform 0.3s ease;
-        }
+        .history-item { border-bottom: 1px solid #222; padding: 12px 0; display: flex; align-items: center; gap: 12px; }
 
-        /* スマートな選択ボックス */
-        .edit-check-wrapper {
-            width: 0; overflow: hidden; transition: width 0.3s ease, margin-right 0.3s ease;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .edit-check-wrapper { width: 0; overflow: hidden; transition: width 0.3s ease; display: flex; align-items: center; }
         .editing .edit-check-wrapper { width: 30px; margin-right: 10px; }
-        .edit-check {
-            width: 22px; height: 22px; border: 2px solid #555; border-radius: 50%;
-            appearance: none; -webkit-appearance: none; position: relative;
-        }
+        .edit-check { width: 22px; height: 22px; border: 2px solid #555; border-radius: 50%; appearance: none; -webkit-appearance: none; position: relative; }
         .edit-check:checked { background: var(--accent-color); border-color: var(--accent-color); }
-        .edit-check:checked::after {
-            content: '✓'; position: absolute; color: #000; font-size: 14px; font-weight: bold;
-            top: 50%; left: 50%; transform: translate(-50%, -50%);
-        }
+        .edit-check:checked::after { content: '✓'; position: absolute; color: #000; font-size: 14px; font-weight: bold; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
         .h-img { width: 65px; height: 65px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
         .h-content { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -127,12 +111,16 @@
             padding-bottom: calc(18px + env(safe-area-inset-bottom));
         }
 
-        /* 画像拡大 */
+        /* 写真確認エリア（拡大＋スクロール） */
         #img-container {
             width: 100%; aspect-ratio: 1/1; overflow: hidden; position: relative;
             border-radius: 12px; background: #111; margin-bottom: 20px; touch-action: none;
         }
-        #edit-img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.1s ease-out; transform-origin: center; }
+        #edit-img {
+            width: 100%; height: 100%; object-fit: contain;
+            position: absolute; top: 0; left: 0;
+            transition: transform 0.1s ease-out; transform-origin: center;
+        }
 
         canvas { display: none; }
     </style>
@@ -141,7 +129,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.1</div>
+        <div class="ver-label">v1.4.2</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -154,14 +142,8 @@
                 <span class="no-photo" id="no-photo-text">未撮影</span>
             </div>
             <div class="input-form-area">
-                <div class="input-group">
-                    <label>食品名</label>
-                    <input type="text" id="input-name" placeholder="例：豚肉">
-                </div>
-                <div class="input-group">
-                    <label>期限日付</label>
-                    <input type="date" id="input-date">
-                </div>
+                <div class="input-group"><label>食品名</label><input type="text" id="input-name" placeholder="例：豚肉"></div>
+                <div class="input-group"><label>期限日付</label><input type="date" id="input-date"></div>
             </div>
         </div>
         <div id="bottom-controls">
@@ -183,7 +165,7 @@
 
     <div id="detail-panel" class="overlay-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <span style="font-weight:bold; font-size:18px;">確認・編集</span>
+            <span style="font-weight:bold; font-size:18px;">拡大確認・編集</span>
             <button onclick="closePanel('detail-panel')" style="background:#333; color:#fff; border:none; border-radius:50%; width:36px; height:36px; font-size:18px;">×</button>
         </div>
         <div id="img-container">
@@ -224,7 +206,6 @@
     const previewImg = document.getElementById('photo-preview');
     const noPhotoText = document.getElementById('no-photo-text');
     
-    let videoTrack = null;
     let capturedImageData = null;
     let currentEditId = null;
     let isEditMode = false;
@@ -232,11 +213,10 @@
     async function startCamera() {
         try {
             const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
-            video.srcObject = s; videoTrack = s.getVideoTracks()[0];
-        } catch (e) { console.error("Camera Error:", e); }
+            video.srcObject = s;
+        } catch (e) { console.error(e); }
     }
 
-    // スクエア撮影
     document.getElementById('shutter-btn').addEventListener('click', () => {
         const vW = video.videoWidth; const vH = video.videoHeight;
         const size = Math.min(vW, vH);
@@ -246,7 +226,7 @@
         capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block'; noPhotoText.style.display = 'none';
-        statusBar.innerText = "撮影しました！";
+        statusBar.innerText = "撮影成功！";
     });
 
     document.getElementById('save-btn').addEventListener('click', () => {
@@ -267,28 +247,46 @@
         });
     });
 
-    // 拡大縮小（ピンチズーム）
-    let currentScale = 1, initialDist = 0;
+    // 自由な拡大とスクロール（パン）
+    let scale = 1, lastScale = 1;
+    let posX = 0, posY = 0, startX = 0, startY = 0;
+    let initialDist = 0;
     const imgCont = document.getElementById('img-container');
     const editImg = document.getElementById('edit-img');
+
     imgCont.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-    });
-    imgCont.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && initialDist > 0) {
-            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            currentScale = Math.min(Math.max(1, currentScale * (dist / initialDist)), 4);
-            editImg.style.transform = `scale(${currentScale})`;
-            initialDist = dist;
+        if (e.touches.length === 1) {
+            startX = e.touches[0].pageX - posX;
+            startY = e.touches[0].pageY - posY;
+        } else if (e.touches.length === 2) {
+            initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            lastScale = scale;
         }
     });
+
+    imgCont.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (e.touches.length === 1) {
+            posX = e.touches[0].pageX - startX;
+            posY = e.touches[0].pageY - startY;
+        } else if (e.touches.length === 2) {
+            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            scale = Math.min(Math.max(1, lastScale * (dist / initialDist)), 4);
+        }
+        updateTransform();
+    });
+
+    function updateTransform() {
+        editImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    }
 
     function openEdit(id, name, date, img) {
         if (isEditMode) return;
         currentEditId = id;
         document.getElementById('edit-name').value = name === "未入力" ? "" : name;
         document.getElementById('edit-date').value = date;
-        editImg.src = img; currentScale = 1; editImg.style.transform = "scale(1)";
+        editImg.src = img;
+        scale = 1; posX = 0; posY = 0; updateTransform();
         document.getElementById('detail-panel').style.display = 'block';
     }
 
