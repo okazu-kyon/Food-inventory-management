@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.0</title>
+    <title>Food Manager v1.4.1</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -13,6 +13,9 @@
             --accent-color: #00ff00;
             --name-color: #00ccff;
             --text-color: #ffffff;
+            --safe-blue: #00ccff;
+            --warn-yellow: #ffff00;
+            --danger-red: #ff4444;
         }
 
         body, html {
@@ -26,8 +29,7 @@
         #main-container {
             display: flex;
             flex-direction: column;
-            width: 100%;
-            height: 100vh;
+            width: 100%; height: 100vh;
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
             box-sizing: border-box;
@@ -35,125 +37,66 @@
 
         /* カメラエリア */
         #camera-section {
-            height: 33vh;
-            width: 100%;
-            position: relative;
-            background: #000;
-            overflow: hidden;
-            flex-shrink: 0;
+            height: 33vh; width: 100%;
+            position: relative; background: #000; overflow: hidden; flex-shrink: 0;
         }
-        video {
-            width: 100%; height: 100%;
-            object-fit: cover; pointer-events: none;
-        }
-        .ver-label {
-            position: absolute; top: 10px; left: 10px; 
-            font-size: 10px; color: rgba(255,255,255,0.4); z-index: 10;
-        }
+        video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        .ver-label { position: absolute; top: 10px; left: 10px; font-size: 10px; color: rgba(255,255,255,0.4); z-index: 10; }
         .btn-reload {
             position: absolute; top: 10px; right: 10px;
             background: rgba(255,255,255,0.1); color: #fff;
             border: 1px solid rgba(255,255,255,0.3);
-            padding: 4px 10px; border-radius: 4px; font-size: 11px;
-            z-index: 20;
+            padding: 4px 10px; border-radius: 4px; font-size: 11px; z-index: 20;
         }
 
-        /* メイン操作エリア */
+        /* 操作エリア */
         #panel-section {
-            flex: 1;
-            background: var(--panel-bg);
-            display: flex;
-            flex-direction: column;
-            padding: 10px 20px;
-            box-sizing: border-box;
+            flex: 1; background: var(--panel-bg);
+            display: flex; flex-direction: column;
+            padding: 10px 20px; box-sizing: border-box;
         }
 
-        /* ステータス表示の巨大化 */
         #status-bar {
-            font-size: 18px; /* 大きく */
-            font-weight: bold; /* 太く */
-            text-align: center; 
-            color: var(--accent-color);
-            background: rgba(0,255,0,0.15); 
-            padding: 8px; 
-            border-radius: 8px;
-            margin-bottom: 15px; 
-            min-height: 24px;
-            transition: all 0.3s;
+            font-size: 18px; font-weight: bold; text-align: center; 
+            color: var(--accent-color); background: rgba(0,255,0,0.15); 
+            padding: 8px; border-radius: 8px; margin-bottom: 15px; 
+            min-height: 24px; transition: all 0.3s;
         }
 
-        .input-row { 
-            display: flex; 
-            align-items: flex-start; 
-            gap: 15px; 
-            width: 100%;
-            box-sizing: border-box;
-        }
+        .input-row { display: flex; align-items: flex-start; gap: 15px; width: 100%; box-sizing: border-box; }
         .preview-box {
-            width: 70px; height: 70px;
-            background: #000; border: 1px solid #333; border-radius: 8px;
+            width: 70px; height: 70px; background: #000; border: 1px solid #333; border-radius: 8px;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
             flex-shrink: 0; margin-top: 22px;
         }
         #photo-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
         .no-photo { font-size: 9px; color: #444; }
 
-        .input-form-area { 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px;
-            min-width: 0;
-        }
+        .input-form-area { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
         .input-group { display: flex; flex-direction: column; width: 100%; }
         .input-group label { font-size: 11px; color: #888; margin-bottom: 4px; text-align: left; }
         
-        /* 枠の高さと文字位置を完全に統一 */
         input {
-            width: 100%; 
-            height: 48px; /* 高さを明示的に固定 */
-            min-height: 48px;
-            background: #000; 
-            border: 1px solid #333;
-            color: #fff; 
-            padding: 0 12px; /* 上下パディングを0にして中央寄せ */
-            border-radius: 8px;
-            box-sizing: border-box; 
-            font-size: 16px;
-            text-align: left; 
-            display: flex;
-            align-items: center;
-            appearance: none;
-            -webkit-appearance: none;
+            width: 100%; height: 48px; min-height: 48px; background: #000; 
+            border: 1px solid #333; color: #fff; padding: 0 12px;
+            border-radius: 8px; box-sizing: border-box; font-size: 16px;
+            text-align: left; display: flex; align-items: center;
+            appearance: none; -webkit-appearance: none;
         }
 
-        /* 最下部ボタンユニット */
-        #bottom-controls {
-            margin-top: auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            padding-bottom: 10px;
-        }
-
-        .btn-side {
-            flex: 1; height: 50px; border-radius: 25px;
-            font-size: 14px; font-weight: bold; border: none;
-        }
+        /* 下部ボタン */
+        #bottom-controls { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding-bottom: 10px; }
+        .btn-side { flex: 1; height: 50px; border-radius: 25px; font-size: 14px; font-weight: bold; border: none; }
         #save-btn { background: var(--accent-color); color: #000; }
         #toggle-history { background: #333; color: #fff; }
 
         #shutter-btn {
-            width: 75px; height: 75px;
-            background: #fff; border: 5px solid #444; border-radius: 50%;
+            width: 75px; height: 75px; background: #fff; border: 5px solid #444; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-size: 28px; box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            flex-shrink: 0;
+            font-size: 28px; box-shadow: 0 0 15px rgba(0,0,0,0.5); flex-shrink: 0;
         }
-        #shutter-btn:active { background: #ccc; transform: scale(0.9); }
 
-        /* リスト表示項目 */
+        /* リスト・編集パネル */
         .overlay-panel {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: none;
@@ -161,6 +104,7 @@
             overflow-y: auto; touch-action: auto;
         }
 
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .history-item {
             border-bottom: 1px solid #222; padding: 12px 0;
             display: flex; align-items: center; gap: 15px;
@@ -172,9 +116,19 @@
         .h-days { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: #000; font-weight: bold; margin-left: 5px; }
         .h-reg-date { font-size: 10px; color: #555; text-align: left; }
 
-        #detail-view img { width: 100%; border-radius: 12px; margin-bottom: 20px; }
-        .detail-input-group { margin-bottom: 15px; }
-        .detail-input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; text-align: left; }
+        /* 編集モード用スタイル */
+        .edit-check { display: none; width: 24px; height: 24px; flex-shrink: 0; border: 2px solid #555; border-radius: 4px; }
+        .editing .edit-check { display: block; }
+        .edit-check:checked { background: var(--accent-color); }
+        #bulk-delete-bar { 
+            position: fixed; bottom: 0; left: 0; width: 100%; 
+            background: #cc0000; color: #fff; padding: 15px; 
+            text-align: center; font-weight: bold; display: none; z-index: 110; 
+        }
+
+        /* 画像拡大用の詳細画面 */
+        #img-container { width: 100%; overflow: hidden; position: relative; border-radius: 12px; background: #111; margin-bottom: 20px; touch-action: none; }
+        #edit-img { width: 100%; transition: transform 0.1s; transform-origin: center; }
 
         canvas { display: none; }
     </style>
@@ -183,13 +137,13 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.0</div>
+        <div class="ver-label">v1.4.1</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
 
     <div id="panel-section">
-        <div id="status-bar">Firebase Ready</div>
+        <div id="status-bar">準備完了</div>
         
         <div class="input-row">
             <div class="preview-box">
@@ -216,20 +170,24 @@
     </div>
 
     <div id="history-panel" class="overlay-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div class="history-header">
+            <button id="edit-mode-btn" style="background:#333; color:#fff; border:none; padding:8px 15px; border-radius:6px;">選択</button>
             <span style="font-weight:bold; font-size:20px;">共有リスト</span>
             <button onclick="closePanel('history-panel')" style="background:#333; color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:20px;">×</button>
         </div>
         <div id="history-list"></div>
+        <div id="bulk-delete-bar" onclick="bulkDelete()">選択した項目を削除</div>
     </div>
 
     <div id="detail-panel" class="overlay-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <span style="font-weight:bold; font-size:18px;">確認・編集</span>
+            <span style="font-weight:bold; font-size:18px;">拡大確認・編集</span>
             <button onclick="closePanel('detail-panel')" style="background:#333; color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:20px;">×</button>
         </div>
-        <div id="detail-view">
+        <div id="img-container">
             <img id="edit-img" src="">
+        </div>
+        <div id="detail-view">
             <div class="detail-input-group">
                 <label>食品名</label>
                 <input type="text" id="edit-name">
@@ -239,7 +197,7 @@
                 <input type="date" id="edit-date">
             </div>
             <div style="display:flex; gap:10px; margin-top:20px;">
-                <button id="update-btn" style="flex:2; background:var(--accent-color); color:#000; border:none; padding:15px; border-radius:10px; font-weight:bold;">更新する</button>
+                <button id="update-btn" style="flex:2; background:var(--accent-color); color:#000; border:none; padding:15px; border-radius:10px; font-weight:bold;">更新</button>
                 <button id="delete-btn" style="flex:1; background:#cc0000; color:#fff; border:none; padding:15px; border-radius:10px; font-weight:bold;">削除</button>
             </div>
         </div>
@@ -271,46 +229,36 @@
     const noPhotoText = document.getElementById('no-photo-text');
     
     let videoTrack = null;
-    let currentZoom = 1.0;
-    let initialPinchDistance = null;
     let capturedImageData = null;
     let currentEditId = null;
+    let isEditMode = false;
 
     async function startCamera() {
         try {
             const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
-            video.srcObject = s;
-            videoTrack = s.getVideoTracks()[0];
-            video.onloadedmetadata = () => { video.play(); applyZoom(1.0); };
-        } catch (e) { console.error(e); }
+            video.srcObject = s; videoTrack = s.getVideoTracks()[0]; video.onloadedmetadata = () => video.play();
+        } catch (e) { console.error("Camera Error", e); }
     }
 
-    async function applyZoom(val) {
-        if (!videoTrack) return;
-        try {
-            const cap = videoTrack.getCapabilities();
-            if (cap.zoom) {
-                currentZoom = Math.max(cap.zoom.min, Math.min(val, cap.zoom.max));
-                await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-            }
-        } catch(e) {}
-    }
-
-    // 撮影
+    // 撮影（表示領域のみをクロップ）
     document.getElementById('shutter-btn').addEventListener('click', () => {
-        const scale = 500 / video.videoWidth;
+        const vW = video.videoWidth;
+        const vH = video.videoHeight;
+        const targetH = vW * 0.33; // 33vh相当
         canvas.width = 500;
-        canvas.height = video.videoHeight * scale;
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.height = 500 * (targetH / vW);
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, (vH - targetH)/2, vW, targetH, 0, 0, canvas.width, canvas.height);
+        
         capturedImageData = canvas.toDataURL('image/jpeg', 0.7);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block'; noPhotoText.style.display = 'none';
         statusBar.innerText = "撮影成功！保存してね";
     });
 
-    // 保存
     document.getElementById('save-btn').addEventListener('click', () => {
-        if (!capturedImageData) return; 
+        if (!capturedImageData) return;
         const now = new Date();
         db.push({
             name: inputName.value || "未入力",
@@ -320,27 +268,72 @@
             timestamp: Date.now()
         }).then(() => {
             statusBar.innerText = "✨ 保存完了しました！ ✨";
-            setTimeout(() => { statusBar.innerText = "Firebase Ready"; }, 3000);
+            setTimeout(() => { statusBar.innerText = "準備完了"; }, 2000);
             inputName.value = ""; inputDate.value = "";
             previewImg.style.display = 'none'; noPhotoText.style.display = 'block';
             capturedImageData = null;
         });
     });
 
+    // ズーム機能のセットアップ
+    let scale = 1, lastScale = 1;
+    const imgCont = document.getElementById('img-container');
+    const editImg = document.getElementById('edit-img');
+    
+    imgCont.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            lastScale = scale;
+            initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        }
+    });
+    imgCont.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            scale = Math.min(Math.max(1, lastScale * (dist / initialDist)), 4);
+            editImg.style.transform = `scale(${scale})`;
+        }
+    });
+
     function openEdit(id, name, date, img) {
+        if (isEditMode) return;
         currentEditId = id;
         document.getElementById('edit-name').value = name === "未入力" ? "" : name;
         document.getElementById('edit-date').value = date;
-        document.getElementById('edit-img').src = img;
+        editImg.src = img;
+        scale = 1; editImg.style.transform = "scale(1)";
         document.getElementById('detail-panel').style.display = 'block';
     }
 
+    // 編集モード（一括削除）
+    document.getElementById('edit-mode-btn').addEventListener('click', (e) => {
+        isEditMode = !isEditMode;
+        const panel = document.getElementById('history-panel');
+        const btn = e.target;
+        if (isEditMode) {
+            panel.classList.add('editing');
+            btn.innerText = "キャンセル";
+            document.getElementById('bulk-delete-bar').style.display = 'block';
+        } else {
+            panel.classList.remove('editing');
+            btn.innerText = "選択";
+            document.getElementById('bulk-delete-bar').style.display = 'none';
+        }
+    });
+
+    function bulkDelete() {
+        const selected = document.querySelectorAll('.edit-check:checked');
+        if (selected.length === 0) return;
+        if (confirm(`${selected.length}件削除しますか？`)) {
+            selected.forEach(cb => db.child(cb.dataset.id).remove());
+            document.getElementById('edit-mode-btn').click();
+        }
+    }
+
     document.getElementById('update-btn').addEventListener('click', () => {
-        if (!currentEditId) return;
         db.child(currentEditId).update({
             name: document.getElementById('edit-name').value || "未入力",
             date: document.getElementById('edit-date').value
-        }).then(() => { closePanel('detail-panel'); statusBar.innerText = "更新しました"; });
+        }).then(() => closePanel('detail-panel'));
     });
 
     document.getElementById('delete-btn').addEventListener('click', () => {
@@ -361,11 +354,20 @@
             let daysLabel = "";
             if (h.date) {
                 const diff = Math.ceil((new Date(h.date) - today) / 86400000);
-                const color = diff <= 3 ? "#ff4444" : "#00ff00";
+                let color = "var(--safe-blue)"; // あと3日以上
+                if (diff <= 0) color = "var(--danger-red)"; // 過ぎた
+                else if (diff <= 3) color = "var(--warn-yellow)"; // 3日以内(黄色) ※指示通り0日まで黄色
+                
+                // 正確な条件反映
+                if (diff > 3) color = "var(--safe-blue)";
+                else if (diff >= 0) color = "var(--warn-yellow)";
+                else color = "var(--danger-red)";
+
                 daysLabel = `<span class="h-days" style="background:${color};">あと${diff}日</span>`;
             }
             return `
                 <div class="history-item" onclick="openEdit('${h.id}', '${h.name}', '${h.date}', '${h.image}')">
+                    <input type="checkbox" class="edit-check" data-id="${h.id}">
                     <img src="${h.image}" class="h-img">
                     <div class="h-content">
                         <span class="h-name">${h.name}</span>
