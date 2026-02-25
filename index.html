@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.3.3</title>
+    <title>Food Manager v1.3.4</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -33,9 +33,9 @@
             box-sizing: border-box;
         }
 
-        /* 1. カメラ領域：画面の3分の1、横幅いっぱい */
+        /* カメラエリア（1/3） */
         #camera-section {
-            height: 33vh; 
+            height: 33vh;
             width: 100%;
             position: relative;
             background: #000;
@@ -45,79 +45,89 @@
         video {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* 33vhの枠内に映像を充填 */
+            object-fit: cover;
         }
         .ver-label {
             position: absolute; top: 10px; left: 10px; 
             font-size: 10px; color: rgba(255,255,255,0.5); z-index: 10;
         }
 
-        /* 2. 操作領域：残りの3分の2 */
+        /* メイン操作エリア */
         #panel-section {
             flex: 1;
             background: var(--panel-bg);
             display: flex;
             flex-direction: column;
-            padding: 10px 20px;
-            gap: 12px;
+            padding: 20px;
             box-sizing: border-box;
+            position: relative;
         }
 
-        /* シャッターボタンを操作エリアのトップに配置 */
-        #shutter-container {
-            display: flex;
-            justify-content: center;
-            margin-top: -30px; /* カメラに少し食い込ませて押しやすく */
-            margin-bottom: 5px;
-            z-index: 50;
-        }
-        #shutter-btn {
-            width: 60px; height: 60px;
-            background: #fff;
-            border: 4px solid #333;
-            border-radius: 50%;
-            display: flex;
-            align-items: center; justify-content: center;
-            font-size: 24px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        }
-        #shutter-btn:active { background: #ccc; transform: scale(0.9); }
-
-        .status-msg {
+        #status-bar {
             font-size: 11px; text-align: center; color: var(--accent-color);
-            background: rgba(0,255,0,0.1); padding: 4px; border-radius: 4px;
+            background: rgba(0,255,0,0.05); padding: 4px; border-radius: 4px;
+            margin-bottom: 20px;
         }
 
-        .input-row { display: flex; align-items: center; gap: 15px; }
+        .input-row { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
         .preview-box {
-            width: 65px; height: 65px;
-            background: #000; border: 1px solid #444; border-radius: 8px;
+            width: 60px; height: 60px;
+            background: #000; border: 1px solid #333; border-radius: 8px;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
             flex-shrink: 0;
         }
         #photo-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
-        .no-photo { font-size: 10px; color: #444; }
+        .no-photo { font-size: 9px; color: #444; }
 
-        .input-group { flex: 1; display: flex; flex-direction: column; }
-        .input-group label { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .input-group { display: flex; flex-direction: column; }
+        .input-group label { font-size: 11px; color: #888; margin-bottom: 6px; }
         input {
-            width: 100%; background: #000; border: 1px solid #333;
+            background: #000; border: 1px solid #333;
             color: #fff; padding: 12px; border-radius: 8px;
             box-sizing: border-box; font-size: 16px;
         }
+        
+        /* 食品名入力は広めに */
+        #input-name { width: 100%; }
+        
+        /* 日付入力の幅を絞る */
+        #date-group { width: 160px; margin-bottom: 20px; }
 
-        .btn-save {
-            background: var(--accent-color); color: #000;
-            border: none; padding: 16px; border-radius: 30px;
-            font-size: 17px; font-weight: bold; width: 100%;
-            margin-top: auto; /* 一番下に配置 */
+        /* 最下部ボタンユニット（コマンドセンター） */
+        #bottom-controls {
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding-bottom: 10px;
         }
 
-        .btn-history {
-            font-size: 13px; color: #aaa; background: transparent;
-            border: 1px solid #333; padding: 10px; border-radius: 20px;
-            margin-bottom: 5px;
+        .btn-side {
+            flex: 1;
+            height: 50px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
         }
+        
+        #save-btn { background: var(--accent-color); color: #000; }
+        #toggle-history { background: #333; color: #fff; }
+
+        #shutter-btn {
+            width: 70px; height: 70px;
+            background: #fff;
+            border: 5px solid #444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center; justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+        #shutter-btn:active { background: #ccc; transform: scale(0.9); }
 
         /* 履歴オーバーレイ */
         #history-panel {
@@ -133,8 +143,8 @@
         .h-img { width: 55px; height: 55px; border-radius: 6px; object-fit: cover; }
         .h-content { flex: 1; }
         .h-name { color: var(--name-color); font-weight: bold; font-size: 16px; }
-        .h-date { font-size: 13px; color: #aaa; display: block; }
-        .h-days { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; color: #000; font-weight: bold; margin-left: 5px; }
+        .h-date { font-size: 13px; color: #aaa; }
+        .h-days { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: #000; font-weight: bold; margin-left: 5px; }
 
         canvas { display: none; }
     </style>
@@ -143,40 +153,39 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.3.3</div>
+        <div class="ver-label">v1.3.4</div>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
 
     <div id="panel-section">
-        <div id="shutter-container">
-            <div id="shutter-btn">📷</div>
-        </div>
-
-        <div id="status-bar" class="status-msg">Firebase Connected</div>
+        <div id="status-bar">Firebase Ready</div>
         
         <div class="input-row">
             <div class="preview-box">
                 <img id="photo-preview">
                 <span class="no-photo" id="no-photo-text">未撮影</span>
             </div>
-            <div class="input-group">
+            <div class="input-group" style="flex:1;">
                 <label>食品名</label>
-                <input type="text" id="input-name" placeholder="例：ぶた肉">
+                <input type="text" id="input-name" placeholder="商品名を入力">
             </div>
         </div>
 
-        <div class="input-group">
-            <label>期限日付（タップでカレンダー）</label>
+        <div class="input-group" id="date-group">
+            <label>期限日付</label>
             <input type="date" id="input-date">
         </div>
 
-        <button id="toggle-history" class="btn-history">家族の共有リストを表示</button>
-        <button id="save-btn" class="btn-save">この内容でクラウド保存</button>
+        <div id="bottom-controls">
+            <button id="toggle-history" class="btn-side">履歴</button>
+            <div id="shutter-btn">📷</div>
+            <button id="save-btn" class="btn-side">保存</button>
+        </div>
     </div>
 
     <div id="history-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <span style="font-weight:bold; font-size:20px;">共有リスト</span>
+            <span style="font-weight:bold; font-size:20px;">家族の共有リスト</span>
             <button onclick="toggleHistory()" style="background:#333; color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:20px;">×</button>
         </div>
         <div id="history-list"></div>
@@ -221,7 +230,7 @@
                 video.play(); 
                 setTimeout(() => applyZoom(1.5), 500);
             };
-        } catch (e) { statusBar.innerText = "カメラ起動エラー"; console.error(e); }
+        } catch (e) { statusBar.innerText = "カメラエラー"; console.error(e); }
     }
 
     async function applyZoom(val) {
@@ -235,44 +244,29 @@
         } catch(e) {}
     }
 
-    // ピンチズーム（カメラ領域のみ）
-    document.getElementById('camera-section').addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-    });
-    document.getElementById('camera-section').addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && initialPinchDistance) {
-            e.preventDefault();
-            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            applyZoom(currentZoom + (dist - initialPinchDistance) / 100);
-            initialPinchDistance = dist;
-        }
-    });
-
     // 撮影
     document.getElementById('shutter-btn').addEventListener('click', () => {
-        const scale = 400 / video.videoWidth;
-        canvas.width = 400;
+        const scale = 300 / video.videoWidth;
+        canvas.width = 300;
         canvas.height = video.videoHeight * scale;
         canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
         capturedImageData = canvas.toDataURL('image/jpeg', 0.6);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block';
         noPhotoText.style.display = 'none';
-        statusBar.innerText = "写真を撮りました！残りを入力してください";
+        statusBar.innerText = "撮影成功！";
     });
 
     // 保存
     document.getElementById('save-btn').addEventListener('click', () => {
-        if (!inputName.value || !inputDate.value || !capturedImageData) {
-            return alert("写真・名前・日付のすべてが必要です");
-        }
+        if (!inputName.value || !inputDate.value || !capturedImageData) return alert("全部入力してね");
         db.push({
             name: inputName.value,
             date: inputDate.value,
             image: capturedImageData,
             timestamp: Date.now()
         }).then(() => {
-            statusBar.innerText = "クラウドに保存しました！";
+            statusBar.innerText = "クラウドに保存完了！";
             inputName.value = ""; inputDate.value = "";
             previewImg.style.display = 'none';
             noPhotoText.style.display = 'block';
@@ -285,7 +279,6 @@
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     }
 
-    // 履歴表示
     db.on('value', (snapshot) => {
         const data = snapshot.val();
         const listItems = [];
@@ -303,7 +296,7 @@
                         <span class="h-name">${h.name}</span>
                         <span class="h-date">${h.date} <span class="h-days" style="background:${color};">あと${diffDays}日</span></span>
                     </div>
-                    <button onclick="if(confirm('削除しますか？')) db.child('${h.id}').remove()" style="background:#333; color:#888; border:none; border-radius:50%; width:35px; height:35px;">×</button>
+                    <button onclick="if(confirm('削除？')) db.child('${h.id}').remove()" style="background:#333; color:#888; border:none; border-radius:50%; width:30px; height:30px;">×</button>
                 </div>
             `;
         }).join('');
