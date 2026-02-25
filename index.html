@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Date Reader Test v1.0.2</title>
+    <title>Date Reader v1.0.3</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        /* 1. デザイン・レイアウトの固定: 既存の配置を維持しつつ配色のみ修正 */
         :root {
-            /* 「黒すぎ」を解消する明るめのダークグレー */
             --bg-color: #222222;
-            --overlay-color: rgba(0, 0, 0, 0.3); /* 透過度を30%まで下げて周囲を明るく */
-            --guide-color: #ffffff; /* 数字を見やすくするための白い枠 */
+            --overlay-color: rgba(0, 0, 0, 0.4);
+            --guide-color: #ffffff;
             --accent-color: #00ff00;
             --text-color: #ffffff;
         }
@@ -24,7 +23,6 @@
             color: var(--text-color);
             font-family: -apple-system, sans-serif;
             overflow: hidden;
-            /* 2. iOS/Safariへの配慮: ズーム等の干渉防止 */
             touch-action: none;
             -webkit-user-select: none;
         }
@@ -45,14 +43,12 @@
             object-fit: cover;
         }
 
-        /* 読み取りエリアの改善: 「日付」を捉えやすい横長のガイド */
         .overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.2); /* 全体的に明るく */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -61,14 +57,13 @@
 
         .guide-box {
             width: 80%;
-            height: 120px; /* 日付・数字用に横長に設定 */
+            height: 120px;
             border: 2px solid var(--guide-color);
             border-radius: 8px;
-            box-shadow: 0 0 0 5000px var(--overlay-color), inset 0 0 15px rgba(255,255,255,0.2);
+            box-shadow: 0 0 0 5000px var(--overlay-color);
             position: relative;
         }
 
-        /* 4角の強調（数字へのピント合わせを補助） */
         .guide-box::before {
             content: '';
             position: absolute;
@@ -82,36 +77,54 @@
 
         .controls {
             position: absolute;
-            bottom: 50px;
+            bottom: 40px;
             width: 100%;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
             z-index: 10;
         }
 
         button {
-            background: rgba(60, 60, 60, 0.8);
-            color: white;
-            border: 1px solid #fff;
-            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
             border-radius: 30px;
-            font-size: 16px;
-            /* iOS用タップ対策 */
+            font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
         }
 
-        #status-display {
+        button:disabled {
+            background: #666;
+            color: #999;
+        }
+
+        #result-display {
             position: absolute;
             top: 40px;
             width: 90%;
             left: 5%;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 8px;
-            border-radius: 4px;
-            font-size: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
             text-align: center;
-            pointer-events: none;
+            border: 1px solid var(--accent-color);
+            min-height: 50px;
+        }
+
+        #status-info {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        /* 隠しCanvas: 解析用 */
+        #capture-canvas {
+            display: none;
         }
     </style>
 </head>
@@ -119,72 +132,100 @@
 
 <div id="video-container">
     <video id="camera-view" playsinline autoplay muted></video>
+    <canvas id="capture-canvas"></canvas>
     <div class="overlay">
-        <div class="guide-box"></div>
+        <div class="guide-box" id="guide"></div>
     </div>
-    <div id="status-display">カメラ準備中...</div>
+    
+    <div id="result-display">
+        <div id="date-output">消費期限を枠に合わせてください</div>
+        <div id="status-info">Ready</div>
+    </div>
+
     <div class="controls">
-        <button id="start-btn">カメラを起動/再開</button>
+        <button id="scan-btn">読み取る</button>
+        <button id="start-btn" style="font-size: 14px; padding: 10px 20px; background: #444; color: #fff;">カメラ再起動</button>
     </div>
 </div>
 
 <script>
-    // バージョン管理: v1.0.2 (数字読み取りテスト用)
-    const VERSION = "1.0.2";
+    const VERSION = "1.0.3";
     console.log(`Application Version: ${VERSION}`);
 
     const video = document.getElementById('camera-view');
-    const status = document.getElementById('status-display');
+    const canvas = document.getElementById('capture-canvas');
+    const scanBtn = document.getElementById('scan-btn');
     const startBtn = document.getElementById('start-btn');
+    const dateOutput = document.getElementById('date-output');
+    const statusInfo = document.getElementById('status-info');
+    const guide = document.getElementById('guide');
 
-    // 2. コンソールへの具体的なエラーログ出力
-    function report(msg, detail = "") {
-        console.log(`[LOG] ${msg}`, detail);
-        status.innerText = msg;
-    }
+    let isProcessing = false;
 
     async function startCamera() {
-        report("カメラアクセスをリクエスト中...");
-        
-        const constraints = {
-            video: {
-                facingMode: "environment",
-                width: { ideal: 1920 }, // 数字を読みやすくするため高解像度を要求
-                height: { ideal: 1080 }
-            },
-            audio: false
-        };
-
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+            });
             video.srcObject = stream;
-            
-            // トラック情報の確認（デバッグ用）
-            const track = stream.getVideoTracks()[0];
-            const settings = track.getSettings();
-            report(`起動成功: ${settings.width}x${settings.height} / ${track.label}`);
-            
-            video.onloadedmetadata = () => {
-                video.play().catch(e => report("再生エラー", e));
-            };
+            statusInfo.innerText = "カメラ起動完了";
         } catch (err) {
-            console.error("Camera Error Details:", err);
-            if (err.name === 'NotAllowedError') {
-                report("エラー: カメラの許可が拒否されました");
-            } else if (err.name === 'NotFoundError') {
-                report("エラー: カメラが見つかりません (404)");
-            } else {
-                report(`エラー: ${err.name}`, err.message);
-            }
+            console.error("Camera Error:", err);
+            statusInfo.innerText = "カメラエラー: " + err.name;
         }
     }
 
-    // iOSの自動再生制限対策として、ボタンクリックで開始
-    startBtn.addEventListener('click', () => {
-        startCamera();
-    });
+    async function performOCR() {
+        if (isProcessing) return;
+        isProcessing = true;
+        scanBtn.disabled = true;
+        dateOutput.innerText = "解析中...";
+        statusInfo.innerText = "文字を認識しています...";
 
-    // iOS/Safariのダブルタップズーム防止
+        // ガイド枠の位置に合わせて画像を切り出し
+        const rect = guide.getBoundingClientRect();
+        const scaleX = video.videoWidth / window.innerWidth;
+        const scaleY = video.videoHeight / window.innerHeight;
+
+        canvas.width = rect.width * scaleX;
+        canvas.height = rect.height * scaleY;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, rect.left * scaleX, rect.top * scaleY, rect.width * scaleX, rect.height * scaleY, 0, 0, canvas.width, canvas.height);
+
+        try {
+            const result = await Tesseract.recognize(canvas, 'eng', {
+                logger: m => { if(m.status === 'recognizing') statusInfo.innerText = `解析中: ${Math.round(m.progress * 100)}%`; }
+            });
+
+            const text = result.data.text;
+            console.log("Full OCR Text:", text);
+
+            // 消費期限のパターン（26. 2.26 等）を抽出する正規表現
+            const datePattern = /(\d{2}[.\/\-\s]+\d{1,2}[.\/\-\s]+\d{1,2})/;
+            const match = text.match(datePattern);
+
+            if (match) {
+                dateOutput.innerHTML = `<span style="color:#00ff00; font-size: 24px;">${match[0]}</span>`;
+                statusInfo.innerText = "読み取り成功";
+            } else {
+                dateOutput.innerText = "数字が見つかりません";
+                statusInfo.innerText = "もっと近づけるかピントを合わせてください";
+            }
+        } catch (err) {
+            console.error("OCR Error:", err);
+            dateOutput.innerText = "解析エラー";
+            statusInfo.innerText = err.message;
+        } finally {
+            isProcessing = false;
+            scanBtn.disabled = false;
+        }
+    }
+
+    scanBtn.addEventListener('click', performOCR);
+    startBtn.addEventListener('click', startCamera);
+    window.addEventListener('load', startCamera);
+
+    // iOS Safari ズーム対策
     document.addEventListener('touchstart', (e) => {
         if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
