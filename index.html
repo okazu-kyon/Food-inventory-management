@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multi-Date Reader v1.0.5</title>
+    <title>Flexible Date Reader v1.0.6</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
@@ -23,7 +23,7 @@
             color: var(--text-color);
             font-family: -apple-system, sans-serif;
             overflow: hidden;
-            touch-action: none;
+            touch-action: none; /* iOS/Safariの標準ズームを無効化しスクリプトで制御 */
             -webkit-user-select: none;
         }
 
@@ -57,7 +57,7 @@
 
         .guide-box {
             width: 85%;
-            height: 100px;
+            height: 80px; /* 縦幅をスリムに変更 */
             border: 2px solid var(--guide-color);
             border-radius: 8px;
             box-shadow: 0 0 0 5000px var(--overlay-color);
@@ -96,11 +96,7 @@
             font-weight: bold;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
-
-        button:active { transform: scale(0.98); }
-        button:disabled { background: #666; color: #999; }
 
         #result-display {
             position: absolute;
@@ -119,8 +115,6 @@
             font-size: 22px;
             font-weight: bold;
             color: var(--accent-color);
-            word-break: break-all;
-            min-height: 1.2em;
         }
 
         #status-info {
@@ -142,18 +136,18 @@
     </div>
     
     <div id="result-display">
-        <div id="date-output">日付を枠に入れてください</div>
+        <div id="date-output">ピンチ操作でズームを調整</div>
         <div id="status-info">Ready</div>
     </div>
 
     <div class="controls">
         <button id="scan-btn">日付を読み取る</button>
-        <button id="start-btn" style="font-size: 13px; padding: 8px 16px; background: #333; color: #eee; border-radius: 20px;">カメラ再起動/ズーム再設定</button>
+        <button id="start-btn" style="font-size: 12px; padding: 6px 12px; background: #333; color: #eee; border-radius: 15px;">カメラ再起動</button>
     </div>
 </div>
 
 <script>
-    const VERSION = "1.0.5";
+    const VERSION = "1.0.6";
     console.log(`Application Version: ${VERSION}`);
 
     const video = document.getElementById('camera-view');
@@ -166,6 +160,8 @@
 
     let videoTrack = null;
     let isProcessing = false;
+    let currentZoom = 1.0;
+    let initialPinchDistance = null;
 
     async function startCamera() {
         try {
@@ -177,26 +173,55 @@
             
             video.onloadedmetadata = async () => {
                 await video.play();
-                applyZoom();
+                const capabilities = videoTrack.getCapabilities();
+                if (capabilities.zoom) {
+                    currentZoom = Math.max(capabilities.zoom.min, Math.min(2.0, capabilities.zoom.max));
+                    updateZoom(currentZoom);
+                }
             };
-            statusInfo.innerText = "カメラ起動完了";
+            statusInfo.innerText = "カメラ起動完了 (ピンチでズーム可)";
         } catch (err) {
             console.error("Camera Error:", err);
             statusInfo.innerText = "カメラエラー: " + err.name;
         }
     }
 
-    async function applyZoom() {
+    // ズーム更新処理
+    async function updateZoom(zoomValue) {
         if (!videoTrack) return;
         const capabilities = videoTrack.getCapabilities();
         if (capabilities.zoom) {
-            const targetZoom = Math.min(2.0, capabilities.zoom.max);
+            const val = Math.max(capabilities.zoom.min, Math.min(zoomValue, capabilities.zoom.max));
             try {
-                await videoTrack.applyConstraints({ advanced: [{ zoom: targetZoom }] });
-                statusInfo.innerText = `ズーム2倍適用中`;
-            } catch (e) { console.error("Zoom failed", e); }
+                await videoTrack.applyConstraints({ advanced: [{ zoom: val }] });
+                currentZoom = val;
+                statusInfo.innerText = `ズーム倍率: ${val.toFixed(1)}x`;
+            } catch (e) { console.error("Zoom apply failed", e); }
         }
     }
+
+    // ピンチズームイベントの実装
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            initialPinchDistance = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+        }
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && initialPinchDistance) {
+            e.preventDefault();
+            const currentDistance = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            const diff = (currentDistance - initialPinchDistance) / 100;
+            updateZoom(currentZoom + diff);
+            initialPinchDistance = currentDistance;
+        }
+    }, { passive: false });
 
     async function performOCR() {
         if (isProcessing) return;
@@ -218,14 +243,13 @@
                 logger: m => { if(m.status === 'recognizing') statusInfo.innerText = `解析中: ${Math.round(m.progress * 100)}%`; }
             });
 
-            const text = result.data.text.replace(/\s+/g, ' '); // スペースを正規化
+            const text = result.data.text.replace(/\s+/g, ' ');
             console.log("Detected Text:", text);
 
-            // 日付パターンの拡充
             const patterns = [
-                /\d{2,4}[\.\/\-\s]+\d{1,2}[\.\/\-\s]+\d{1,2}/g, // 26.02.25, 2026/02/25 等
-                /\d{6,8}/g,                                    // 260225, 20260225 等
-                /\d{2,4}年\d{1,2}月\d{1,2}日/g                  // 日本語表記用
+                /\d{2,4}[\.\/\-\s]+\d{1,2}[\.\/\-\s]+\d{1,2}/g,
+                /\d{6,8}/g,
+                /\d{2,4}年\d{1,2}月\d{1,2}日/g
             ];
 
             let foundDates = [];
@@ -235,17 +259,16 @@
             });
 
             if (foundDates.length > 0) {
-                // 重複削除して表示
                 const uniqueDates = [...new Set(foundDates)];
                 dateOutput.innerHTML = uniqueDates.join('<br>');
                 statusInfo.innerText = "日付を検出しました";
             } else {
-                dateOutput.innerText = "日付が見つかりません";
-                statusInfo.innerText = "枠内に日付を大きく映してください";
+                dateOutput.innerText = "日付未検出";
+                statusInfo.innerText = "ピントまたはズームを調整してください";
             }
         } catch (err) {
             console.error("OCR Error:", err);
-            dateOutput.innerText = "解析エラー";
+            dateOutput.innerText = "エラー";
         } finally {
             isProcessing = false;
             scanBtn.disabled = false;
@@ -255,10 +278,6 @@
     scanBtn.addEventListener('click', performOCR);
     startBtn.addEventListener('click', startCamera);
     window.addEventListener('load', startCamera);
-
-    document.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 1) e.preventDefault();
-    }, { passive: false });
 </script>
 
 </body>
