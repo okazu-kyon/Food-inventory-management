@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.1.0</title>
+    <title>Food Manager v1.1.1</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
-            --bg-color: #000000;
-            --panel-bg: rgba(20, 20, 20, 0.98);
+            --bg-color: #111111;
+            --panel-bg: #222222;
             --accent-color: #00ff00;
             --name-color: #00ccff;
             --text-color: #ffffff;
@@ -18,79 +18,67 @@
             margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: var(--bg-color); color: var(--text-color);
             font-family: -apple-system, sans-serif; overflow: hidden;
-            /* iOSでのダブルタップズームやスクロールを徹底的に防止 */
-            touch-action: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
+            touch-action: none; -webkit-user-select: none;
         }
 
-        #video-container {
-            position: relative; width: 100%; height: 100vh;
-            display: flex; flex-direction: column;
+        #main-container {
+            display: flex; flex-direction: column; width: 100%; height: 100vh;
         }
 
-        video { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 1; }
+        /* 上部：カメラエリア */
+        #camera-section {
+            flex: 1; position: relative; background: #000; overflow: hidden;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
 
-        /* 結果入力パネル */
-        #result-panel {
-            position: relative; z-index: 10;
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: none;
+        }
+        .guide-box {
+            width: 80%; height: 100px; border: 2px solid #fff; border-radius: 8px;
+            box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.4); position: relative;
+        }
+        .guide-box::after {
+            content: '枠内に名前または日付を合わせて読取';
+            position: absolute; bottom: -25px; left: 0; width: 100%;
+            text-align: center; color: #fff; font-size: 11px;
+        }
+
+        /* 下部：操作パネル */
+        #panel-section {
             background: var(--panel-bg); padding: 15px;
-            border-bottom: 1px solid #333; box-sizing: border-box;
-            padding-top: calc(15px + env(safe-area-inset-top));
+            padding-bottom: calc(15px + env(safe-area-inset-bottom));
+            border-top: 1px solid #444; z-index: 20;
         }
 
         .ver-badge { font-size: 9px; color: #666; text-align: right; margin-bottom: 5px; }
-        
-        .input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+
+        .input-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; }
         .input-group { flex: 1; }
-        .input-group label { font-size: 10px; color: #888; display: block; margin-bottom: 2px; }
+        .input-group label { font-size: 11px; color: #aaa; display: block; margin-bottom: 3px; }
         input { 
-            width: 100%; background: #111; border: 1px solid #444; color: #fff; 
-            padding: 10px; border-radius: 8px; box-sizing: border-box; font-size: 16px;
-            /* iOSの自動ズーム防止：16px以上に設定 */
+            width: 100%; background: #000; border: 1px solid #555; color: #fff; 
+            padding: 12px; border-radius: 8px; box-sizing: border-box; font-size: 16px;
         }
 
         .btn-action {
-            padding: 10px 15px; border-radius: 8px; border: none; font-size: 12px; font-weight: bold;
+            padding: 12px 15px; border-radius: 8px; border: none; font-size: 13px; font-weight: bold;
             white-space: nowrap; cursor: pointer;
         }
         .btn-name { background: var(--name-color); color: #000; }
         .btn-date { background: var(--accent-color); color: #000; }
 
-        /* シングルガイド枠 */
-        .overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: center;
-            pointer-events: none; z-index: 5;
-        }
-
-        .guide-box {
-            width: 80%; height: 80px;
-            border: 2px solid #ffffff; border-radius: 8px;
-            box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5);
-            position: relative;
-        }
-        .guide-box::after {
-            content: 'ここに名前または日付を合わせる';
-            position: absolute; bottom: -25px; left: 0; width: 100%;
-            text-align: center; color: #fff; font-size: 11px; text-shadow: 1px 1px 2px #000;
-        }
-
-        /* 下部ボタン */
-        .controls {
-            position: absolute; bottom: 30px; width: 100%;
-            display: flex; flex-direction: column; align-items: center; gap: 15px; z-index: 10;
-        }
-
         .btn-save {
-            background: #ffffff; color: #000; border: none; padding: 15px 80px;
-            border-radius: 35px; font-size: 18px; font-weight: bold; width: 85%;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            background: #fff; color: #000; border: none; padding: 15px;
+            border-radius: 30px; font-size: 18px; font-weight: bold; width: 100%;
+            margin-top: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        #status-display {
-            background: rgba(0,0,0,0.8); color: #fff;
-            padding: 6px 16px; border-radius: 20px; font-size: 13px;
+        #status-bar {
+            background: rgba(0,0,0,0.5); color: #ccc; font-size: 11px;
+            padding: 4px 10px; text-align: center;
         }
 
         #history-panel {
@@ -98,14 +86,25 @@
             background: #000; z-index: 100; display: none; padding: 20px; box-sizing: border-box; overflow-y: auto;
         }
 
+        .controls-extra { display: flex; justify-content: center; gap: 20px; margin-top: 15px; }
+        .btn-sub { font-size: 12px; color: #aaa; background: none; border: 1px solid #444; padding: 5px 15px; border-radius: 15px; }
+
         canvas { display: none; }
     </style>
 </head>
 <body>
 
-<div id="video-container">
-    <div id="result-panel">
-        <div class="ver-badge">Ver. 1.1.0</div>
+<div id="main-container">
+    <div id="camera-section">
+        <video id="camera-view" playsinline autoplay muted></video>
+        <div class="overlay">
+            <div class="guide-box" id="main-guide"></div>
+        </div>
+        <div id="status-bar" style="position: absolute; bottom: 0; width: 100%;">Ready (ピンチでズーム)</div>
+    </div>
+
+    <div id="panel-section">
+        <div class="ver-badge">Ver. 1.1.1</div>
         
         <div class="input-row">
             <div class="input-group">
@@ -122,41 +121,33 @@
             </div>
             <button id="scan-date-btn" class="btn-action btn-date">日付読取</button>
         </div>
-    </div>
 
-    <video id="camera-view" playsinline autoplay muted></video>
-    
-    <div class="overlay">
-        <div class="guide-box" id="main-guide"></div>
-    </div>
+        <button id="save-btn" class="btn-save">リストに保存する</button>
 
-    <div class="controls">
-        <div id="status-display">Ready (ピンチでズーム)</div>
-        <button id="save-btn" class="btn-save">保存する</button>
-        <div style="display: flex; gap: 15px;">
-            <button id="toggle-history" style="font-size: 12px; padding: 10px 20px; background: #333; color: #fff; border-radius: 20px; border: 1px solid #555;">履歴</button>
-            <button id="restart-btn" style="font-size: 12px; padding: 10px 20px; background: #333; color: #fff; border-radius: 20px; border: 1px solid #555;">カメラ再起動</button>
+        <div class="controls-extra">
+            <button id="toggle-history" class="btn-sub">履歴を表示</button>
+            <button id="restart-btn" class="btn-sub">再起動</button>
         </div>
     </div>
 
     <div id="history-panel">
-        <div style="display:flex; justify-content:space-between; margin-bottom:20px; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <span style="font-weight:bold; font-size:20px;">保存済みリスト</span>
             <button onclick="toggleHistory()" style="background:#333; color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:20px;">×</button>
         </div>
         <div id="history-list"></div>
-        <button onclick="clearHistory()" style="width:100%; margin-top:30px; padding:15px; background:#400; color:#f66; border:1px solid #600; border-radius:10px;">履歴を全削除</button>
+        <button onclick="clearHistory()" style="width:100%; margin-top:30px; padding:15px; background:#400; color:#f66; border:1px solid #600; border-radius:10px;">履歴をすべて削除</button>
     </div>
 </div>
 
 <canvas id="canvas-temp"></canvas>
 
 <script>
-    const VERSION = "1.1.0";
+    const VERSION = "1.1.1";
     const video = document.getElementById('camera-view');
     const inputName = document.getElementById('input-name');
     const inputDate = document.getElementById('input-date');
-    const statusDisplay = document.getElementById('status-display');
+    const statusBar = document.getElementById('status-bar');
     const canvas = document.getElementById('canvas-temp');
     
     let videoTrack = null;
@@ -164,12 +155,8 @@
     let initialPinchDistance = null;
     let worker = null;
 
-    // --- iOS ズーム対策 ---
-    document.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 1) return; // ピンチ操作は許可
-    }, { passive: false });
-
-    // ダブルタップでのズームをJSで防止
+    // iOS ズームバグ徹底ガード
+    document.addEventListener('touchstart', (e) => { if (e.touches.length > 1) return; }, { passive: false });
     let lastTouchTime = 0;
     document.addEventListener('touchend', (e) => {
         const now = Date.now();
@@ -179,46 +166,39 @@
 
     async function initOCR() {
         if (worker) return;
-        statusDisplay.innerText = "エンジンの準備中...";
+        statusBar.innerText = "OCRエンジン準備中...";
         worker = await Tesseract.createWorker(['jpn', 'eng']);
-        statusDisplay.innerText = "準備完了";
+        statusBar.innerText = "準備完了";
     }
 
     async function startCamera() {
-        if (video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
-        }
+        if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
             });
             video.srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
-            video.onloadedmetadata = () => {
-                video.play();
-                applyZoom(1.5);
-            };
+            video.onloadedmetadata = () => { video.play(); applyZoom(1.5); };
         } catch (err) {
-            statusDisplay.innerText = "カメラ起動失敗";
+            statusBar.innerText = "カメラエラー: " + err.name;
             console.error(err);
         }
     }
 
     async function applyZoom(val) {
         if (!videoTrack) return;
-        const capabilities = videoTrack.getCapabilities();
-        if (capabilities.zoom) {
-            currentZoom = Math.max(capabilities.zoom.min, Math.min(val, capabilities.zoom.max));
+        const cap = videoTrack.getCapabilities();
+        if (cap.zoom) {
+            currentZoom = Math.max(cap.zoom.min, Math.min(val, cap.zoom.max));
             await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-            statusDisplay.innerText = `ズーム: ${currentZoom.toFixed(1)}x`;
+            statusBar.innerText = `ズーム: ${currentZoom.toFixed(1)}x`;
         }
     }
 
     // ピンチズーム
     document.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-            initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-        }
+        if (e.touches.length === 2) initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
     }, { passive: false });
     document.addEventListener('touchmove', (e) => {
         if (e.touches.length === 2 && initialPinchDistance) {
@@ -231,31 +211,29 @@
 
     async function scan(type) {
         if (!worker) await initOCR();
-        statusDisplay.innerText = "解析中...";
-        
-        const scaleX = video.videoWidth / window.innerWidth;
-        const scaleY = video.videoHeight / window.innerHeight;
-        const guide = document.getElementById('main-guide');
-        const rect = guide.getBoundingClientRect();
+        statusBar.innerText = "解析中...";
+        const rect = document.getElementById('main-guide').getBoundingClientRect();
+        const sx = video.videoWidth / video.clientWidth;
+        const sy = video.videoHeight / video.clientHeight;
 
-        canvas.width = rect.width * scaleX;
-        canvas.height = rect.height * scaleY;
+        canvas.width = rect.width * sx;
+        canvas.height = rect.height * sy;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, rect.left * scaleX, rect.top * scaleY, rect.width * scaleX, rect.height * scaleY, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, rect.left * sx, rect.top * sy, rect.width * sx, rect.height * sy, 0, 0, canvas.width, canvas.height);
 
         try {
             const { data: { text } } = await worker.recognize(canvas);
             if (type === 'name') {
                 inputName.value = text.trim().replace(/\s+/g, ' ');
             } else {
-                const datePattern = /(\d{2,4}[\.\/\-\s]+\d{1,2}[\.\/\-\s]+\d{1,2})|(\d{6,8})|(\d{2,4}年\d{1,2}月\d{1,2}日)/g;
-                const match = text.match(datePattern);
-                inputDate.value = match ? match[0] : text.trim();
+                const pattern = /(\d{2,4}[\.\/\-\s]+\d{1,2}[\.\/\-\s]+\d{1,2})|(\d{6,8})|(\d{2,4}年\d{1,2}月\d{1,2}日)/g;
+                const m = text.match(pattern);
+                inputDate.value = m ? m[0] : text.trim();
             }
-            statusDisplay.innerText = "完了";
+            statusBar.innerText = "完了";
         } catch (e) {
             console.error(e);
-            statusDisplay.innerText = "失敗しました";
+            statusBar.innerText = "解析失敗";
         }
     }
 
@@ -265,7 +243,7 @@
         const history = JSON.parse(localStorage.getItem('food_manager_v1') || '[]');
         history.unshift(item);
         localStorage.setItem('food_manager_v1', JSON.stringify(history));
-        statusDisplay.innerText = "保存しました！";
+        statusBar.innerText = "保存しました！";
         inputName.value = ""; inputDate.value = "";
     });
 
