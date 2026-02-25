@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Date Reader v1.0.3</title>
+    <title>Multi-Date Reader v1.0.5</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
@@ -56,8 +56,8 @@
         }
 
         .guide-box {
-            width: 80%;
-            height: 120px;
+            width: 85%;
+            height: 100px;
             border: 2px solid var(--guide-color);
             border-radius: 8px;
             box-shadow: 0 0 0 5000px var(--overlay-color);
@@ -69,10 +69,10 @@
             position: absolute;
             top: -5px; left: -5px; right: -5px; bottom: -5px;
             border: 4px solid var(--accent-color);
-            clip-path: polygon(0 0, 20px 0, 20px 4px, 4px 4px, 4px 20px, 0 20px, 
-                               100% 0, calc(100% - 20px) 0, calc(100% - 20px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 20px, 100% 20px,
-                               100% 100%, calc(100% - 20px) 100%, calc(100% - 20px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 20px), 100% calc(100% - 20px),
-                               0 100%, 20px 100%, 20px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 20px), 0 calc(100% - 20px));
+            clip-path: polygon(0 0, 25px 0, 25px 4px, 4px 4px, 4px 25px, 0 25px, 
+                               100% 0, calc(100% - 25px) 0, calc(100% - 25px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 25px, 100% 25px,
+                               100% 100%, calc(100% - 25px) 100%, calc(100% - 25px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 25px), 100% calc(100% - 25px),
+                               0 100%, 25px 100%, 25px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 25px), 0 calc(100% - 25px));
         }
 
         .controls {
@@ -82,50 +82,54 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
             z-index: 10;
         }
 
         button {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             color: #000;
             border: none;
-            padding: 15px 40px;
+            padding: 16px 50px;
             border-radius: 30px;
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        button:disabled {
-            background: #666;
-            color: #999;
-        }
+        button:active { transform: scale(0.98); }
+        button:disabled { background: #666; color: #999; }
 
         #result-display {
             position: absolute;
             top: 40px;
             width: 90%;
             left: 5%;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             padding: 15px;
-            border-radius: 8px;
+            border-radius: 12px;
             text-align: center;
             border: 1px solid var(--accent-color);
-            min-height: 50px;
+            box-sizing: border-box;
+        }
+
+        #date-output {
+            font-size: 22px;
+            font-weight: bold;
+            color: var(--accent-color);
+            word-break: break-all;
+            min-height: 1.2em;
         }
 
         #status-info {
             font-size: 12px;
-            color: #aaa;
-            margin-top: 5px;
+            color: #ccc;
+            margin-top: 8px;
         }
 
-        /* 隠しCanvas: 解析用 */
-        #capture-canvas {
-            display: none;
-        }
+        #capture-canvas { display: none; }
     </style>
 </head>
 <body>
@@ -138,18 +142,18 @@
     </div>
     
     <div id="result-display">
-        <div id="date-output">消費期限を枠に合わせてください</div>
+        <div id="date-output">日付を枠に入れてください</div>
         <div id="status-info">Ready</div>
     </div>
 
     <div class="controls">
-        <button id="scan-btn">読み取る</button>
-        <button id="start-btn" style="font-size: 14px; padding: 10px 20px; background: #444; color: #fff;">カメラ再起動</button>
+        <button id="scan-btn">日付を読み取る</button>
+        <button id="start-btn" style="font-size: 13px; padding: 8px 16px; background: #333; color: #eee; border-radius: 20px;">カメラ再起動/ズーム再設定</button>
     </div>
 </div>
 
 <script>
-    const VERSION = "1.0.3";
+    const VERSION = "1.0.5";
     console.log(`Application Version: ${VERSION}`);
 
     const video = document.getElementById('camera-view');
@@ -160,6 +164,7 @@
     const statusInfo = document.getElementById('status-info');
     const guide = document.getElementById('guide');
 
+    let videoTrack = null;
     let isProcessing = false;
 
     async function startCamera() {
@@ -168,10 +173,28 @@
                 video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
             });
             video.srcObject = stream;
+            videoTrack = stream.getVideoTracks()[0];
+            
+            video.onloadedmetadata = async () => {
+                await video.play();
+                applyZoom();
+            };
             statusInfo.innerText = "カメラ起動完了";
         } catch (err) {
             console.error("Camera Error:", err);
             statusInfo.innerText = "カメラエラー: " + err.name;
+        }
+    }
+
+    async function applyZoom() {
+        if (!videoTrack) return;
+        const capabilities = videoTrack.getCapabilities();
+        if (capabilities.zoom) {
+            const targetZoom = Math.min(2.0, capabilities.zoom.max);
+            try {
+                await videoTrack.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+                statusInfo.innerText = `ズーム2倍適用中`;
+            } catch (e) { console.error("Zoom failed", e); }
         }
     }
 
@@ -180,9 +203,7 @@
         isProcessing = true;
         scanBtn.disabled = true;
         dateOutput.innerText = "解析中...";
-        statusInfo.innerText = "文字を認識しています...";
 
-        // ガイド枠の位置に合わせて画像を切り出し
         const rect = guide.getBoundingClientRect();
         const scaleX = video.videoWidth / window.innerWidth;
         const scaleY = video.videoHeight / window.innerHeight;
@@ -197,24 +218,34 @@
                 logger: m => { if(m.status === 'recognizing') statusInfo.innerText = `解析中: ${Math.round(m.progress * 100)}%`; }
             });
 
-            const text = result.data.text;
-            console.log("Full OCR Text:", text);
+            const text = result.data.text.replace(/\s+/g, ' '); // スペースを正規化
+            console.log("Detected Text:", text);
 
-            // 消費期限のパターン（26. 2.26 等）を抽出する正規表現
-            const datePattern = /(\d{2}[.\/\-\s]+\d{1,2}[.\/\-\s]+\d{1,2})/;
-            const match = text.match(datePattern);
+            // 日付パターンの拡充
+            const patterns = [
+                /\d{2,4}[\.\/\-\s]+\d{1,2}[\.\/\-\s]+\d{1,2}/g, // 26.02.25, 2026/02/25 等
+                /\d{6,8}/g,                                    // 260225, 20260225 等
+                /\d{2,4}年\d{1,2}月\d{1,2}日/g                  // 日本語表記用
+            ];
 
-            if (match) {
-                dateOutput.innerHTML = `<span style="color:#00ff00; font-size: 24px;">${match[0]}</span>`;
-                statusInfo.innerText = "読み取り成功";
+            let foundDates = [];
+            patterns.forEach(p => {
+                const matches = text.match(p);
+                if (matches) foundDates = foundDates.concat(matches);
+            });
+
+            if (foundDates.length > 0) {
+                // 重複削除して表示
+                const uniqueDates = [...new Set(foundDates)];
+                dateOutput.innerHTML = uniqueDates.join('<br>');
+                statusInfo.innerText = "日付を検出しました";
             } else {
-                dateOutput.innerText = "数字が見つかりません";
-                statusInfo.innerText = "もっと近づけるかピントを合わせてください";
+                dateOutput.innerText = "日付が見つかりません";
+                statusInfo.innerText = "枠内に日付を大きく映してください";
             }
         } catch (err) {
             console.error("OCR Error:", err);
             dateOutput.innerText = "解析エラー";
-            statusInfo.innerText = err.message;
         } finally {
             isProcessing = false;
             scanBtn.disabled = false;
@@ -225,7 +256,6 @@
     startBtn.addEventListener('click', startCamera);
     window.addEventListener('load', startCamera);
 
-    // iOS Safari ズーム対策
     document.addEventListener('touchstart', (e) => {
         if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
