@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.3.6</title>
+    <title>Food Manager v1.3.7</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -73,21 +73,20 @@
         #status-bar {
             font-size: 11px; text-align: center; color: var(--accent-color);
             background: rgba(0,255,0,0.05); padding: 4px; border-radius: 4px;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
-        .input-row { display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; }
+        .input-row { display: flex; align-items: flex-start; gap: 15px; margin-bottom: 5px; }
         .preview-box {
-            width: 60px; height: 60px;
+            width: 70px; height: 70px;
             background: #000; border: 1px solid #333; border-radius: 8px;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-            margin-top: 20px;
+            flex-shrink: 0; margin-top: 18px;
         }
         #photo-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
         .no-photo { font-size: 9px; color: #444; }
 
-        .input-form-area { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+        .input-form-area { flex: 1; display: flex; flex-direction: column; gap: 10px; }
         .input-group { display: flex; flex-direction: column; }
         .input-group label { font-size: 11px; color: #888; margin-bottom: 4px; }
         input {
@@ -124,23 +123,27 @@
         }
         #shutter-btn:active { background: #ccc; transform: scale(0.9); }
 
-        /* 履歴オーバーレイ */
-        #history-panel {
+        /* 共通パネル（リスト・詳細編集） */
+        .overlay-panel {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: none;
             padding: 20px; padding-top: env(safe-area-inset-top); box-sizing: border-box;
             overflow-y: auto; touch-action: auto;
         }
+
         .history-item {
             border-bottom: 1px solid #222; padding: 12px 0;
             display: flex; align-items: center; gap: 15px;
         }
-        .h-img { width: 55px; height: 55px; border-radius: 6px; object-fit: cover; }
+        .h-img { width: 60px; height: 60px; border-radius: 6px; object-fit: cover; }
         .h-content { flex: 1; }
         .h-name { color: var(--name-color); font-weight: bold; font-size: 16px; display: block; }
-        .h-info { font-size: 12px; color: #aaa; }
-        .h-days { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: #000; font-weight: bold; margin-left: 5px; }
         .h-reg-date { font-size: 10px; color: #555; display: block; margin-top: 2px; }
+
+        /* 詳細編集画面用 */
+        #detail-view img { width: 100%; border-radius: 12px; margin-bottom: 20px; }
+        .detail-input-group { margin-bottom: 15px; }
+        .detail-input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
 
         canvas { display: none; }
     </style>
@@ -149,13 +152,13 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.3.6</div>
+        <div class="ver-label">v1.3.7</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
 
     <div id="panel-section">
-        <div id="status-bar">Firebase Ready (ピンチでズーム)</div>
+        <div id="status-bar">Firebase Ready (写真さえあれば保存OK)</div>
         
         <div class="input-row">
             <div class="preview-box">
@@ -181,12 +184,34 @@
         </div>
     </div>
 
-    <div id="history-panel">
+    <div id="history-panel" class="overlay-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <span style="font-weight:bold; font-size:20px;">共有リスト</span>
-            <button onclick="toggleHistory()" style="background:#333; color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:20px;">×</button>
+            <button onclick="closePanel('history-panel')" style="background:#333; color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:20px;">×</button>
         </div>
         <div id="history-list"></div>
+    </div>
+
+    <div id="detail-panel" class="overlay-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <span style="font-weight:bold; font-size:18px;">写真の確認・編集</span>
+            <button onclick="closePanel('detail-panel')" style="background:#333; color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:20px;">×</button>
+        </div>
+        <div id="detail-view">
+            <img id="edit-img" src="">
+            <div class="detail-input-group">
+                <label>食品名</label>
+                <input type="text" id="edit-name">
+            </div>
+            <div class="detail-input-group">
+                <label>期限日付</label>
+                <input type="date" id="edit-date">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button id="update-btn" style="flex:2; background:var(--accent-color); color:#000; border:none; padding:15px; border-radius:10px; font-weight:bold;">内容を更新する</button>
+                <button id="delete-btn" style="flex:1; background:#cc0000; color:#fff; border:none; padding:15px; border-radius:10px; font-weight:bold;">削除</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -218,6 +243,7 @@
     let currentZoom = 1.0;
     let initialPinchDistance = null;
     let capturedImageData = null;
+    let currentEditId = null;
 
     async function startCamera() {
         try {
@@ -226,11 +252,8 @@
             });
             video.srcObject = s;
             videoTrack = s.getVideoTracks()[0];
-            video.onloadedmetadata = () => { 
-                video.play(); 
-                applyZoom(1.0);
-            };
-        } catch (e) { statusBar.innerText = "カメラエラー"; }
+            video.onloadedmetadata = () => { video.play(); applyZoom(1.0); };
+        } catch (e) { console.error("Camera Error:", e); }
     }
 
     async function applyZoom(val) {
@@ -244,12 +267,10 @@
         } catch(e) {}
     }
 
+    // ピンチズーム
     document.getElementById('camera-section').addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-            initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-        }
+        if (e.touches.length === 2) initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
     }, { passive: false });
-
     document.getElementById('camera-section').addEventListener('touchmove', (e) => {
         if (e.touches.length === 2 && initialPinchDistance) {
             e.preventDefault();
@@ -259,68 +280,95 @@
         }
     }, { passive: false });
 
+    // 撮影
     document.getElementById('shutter-btn').addEventListener('click', () => {
-        const scale = 300 / video.videoWidth;
-        canvas.width = 300;
+        const scale = 500 / video.videoWidth; // 期限が読める解像度
+        canvas.width = 500;
         canvas.height = video.videoHeight * scale;
         canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-        capturedImageData = canvas.toDataURL('image/jpeg', 0.6);
+        capturedImageData = canvas.toDataURL('image/jpeg', 0.7);
         previewImg.src = capturedImageData;
         previewImg.style.display = 'block';
         noPhotoText.style.display = 'none';
-        statusBar.innerText = "撮影成功！保存してください";
+        statusBar.innerText = "撮影しました！";
     });
 
+    // 保存（ズボラ仕様：写真さえあればOK、確認なし）
     document.getElementById('save-btn').addEventListener('click', () => {
-        if (!inputName.value || !inputDate.value || !capturedImageData) return alert("全部入力してね");
+        if (!capturedImageData) return alert("まずは写真を撮ってね");
+        
         const now = new Date();
-        db.push({
-            name: inputName.value,
-            date: inputDate.value,
+        const data = {
+            name: inputName.value || "未入力",
+            date: inputDate.value || "",
             image: capturedImageData,
-            regDate: `${now.getMonth() + 1}/${now.getDate()}`, // 登録日
+            regDate: `${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`,
             timestamp: Date.now()
-        }).then(() => {
-            statusBar.innerText = "クラウドに保存しました！";
+        };
+
+        db.push(data).then(() => {
+            statusBar.innerText = "保存しました！";
             inputName.value = ""; inputDate.value = "";
             previewImg.style.display = 'none';
             noPhotoText.style.display = 'block';
             capturedImageData = null;
+        }).catch(e => console.error("Firebase Push Error:", e));
+    });
+
+    // 編集パネルを開く
+    function openEdit(id, name, date, img) {
+        currentEditId = id;
+        document.getElementById('edit-name').value = name === "未入力" ? "" : name;
+        document.getElementById('edit-date').value = date;
+        document.getElementById('edit-img').src = img;
+        document.getElementById('detail-panel').style.display = 'block';
+    }
+
+    // 更新処理
+    document.getElementById('update-btn').addEventListener('click', () => {
+        if (!currentEditId) return;
+        db.child(currentEditId).update({
+            name: document.getElementById('edit-name').value || "未入力",
+            date: document.getElementById('edit-date').value
+        }).then(() => {
+            closePanel('detail-panel');
+            statusBar.innerText = "更新しました";
         });
     });
 
-    function toggleHistory() {
-        const panel = document.getElementById('history-panel');
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-    }
+    // 削除処理
+    document.getElementById('delete-btn').addEventListener('click', () => {
+        if (confirm('削除しますか？')) {
+            db.child(currentEditId).remove().then(() => {
+                closePanel('detail-panel');
+            });
+        }
+    });
 
+    function closePanel(id) { document.getElementById(id).style.display = 'none'; }
+    document.getElementById('toggle-history').addEventListener('click', () => {
+        document.getElementById('history-panel').style.display = 'block';
+    });
+
+    // リスト購読
     db.on('value', (snapshot) => {
         const data = snapshot.val();
         const listItems = [];
         for (let id in data) { listItems.push({ id, ...data[id] }); }
-        const today = new Date(); today.setHours(0,0,0,0);
-        listItems.sort((a, b) => new Date(a.date) - new Date(b.date));
+        listItems.sort((a, b) => b.timestamp - a.timestamp); // 新しい順
         
-        document.getElementById('history-list').innerHTML = listItems.map(h => {
-            const diffDays = Math.ceil((new Date(h.date) - today) / 86400000);
-            const color = diffDays <= 3 ? "#ff4444" : "#00ff00";
-            return `
-                <div class="history-item">
-                    <img src="${h.image}" class="h-img">
-                    <div class="h-content">
-                        <span class="h-name">${h.name}</span>
-                        <div class="h-info">
-                            期限: ${h.date} <span class="h-days" style="background:${color};">あと${diffDays}日</span>
-                        </div>
-                        <span class="h-reg-date">登録日: ${h.regDate || '---'}</span>
-                    </div>
-                    <button onclick="if(confirm('削除？')) db.child('${h.id}').remove()" style="background:#333; color:#888; border:none; border-radius:50%; width:30px; height:30px;">×</button>
+        document.getElementById('history-list').innerHTML = listItems.map(h => `
+            <div class="history-item" onclick="openEdit('${h.id}', '${h.name}', '${h.date}', '${h.image}')">
+                <img src="${h.image}" class="h-img">
+                <div class="h-content">
+                    <span class="h-name">${h.name}</span>
+                    <span class="h-reg-date">登録: ${h.regDate}</span>
                 </div>
-            `;
-        }).join('');
+                <div style="color:#444;">▶</div>
+            </div>
+        `).join('');
     });
 
-    document.getElementById('toggle-history').addEventListener('click', toggleHistory);
     window.addEventListener('load', startCamera);
 </script>
 </body>
