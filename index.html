@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.2.2</title>
+    <title>Food Manager v1.2.3</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -43,6 +43,10 @@
         .input-group { flex: 1; display: flex; flex-direction: column; }
         .input-group label { font-size: 10px; color: #888; margin-bottom: 2px; }
         input { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        
+        /* Date input 特有の調整 */
+        input[type="date"] { position: relative; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
 
         .btn-action { width: 80px; border-radius: 6px; border: none; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
         .btn-name { background: var(--name-color); color: #000; }
@@ -70,7 +74,7 @@
 <div id="main-container">
     <div id="camera-section">
         <div id="top-bar">
-            <span style="font-size: 10px; color: #888;">Food Manager v1.2.2</span>
+            <span style="font-size: 10px; color: #888;">Food Manager v1.2.3</span>
             <button class="btn-reload" onclick="location.reload()">更新</button>
         </div>
         <video id="camera-view" playsinline autoplay muted></video>
@@ -85,7 +89,7 @@
         <div class="input-row">
             <div class="input-group">
                 <label>食品名</label>
-                <input type="text" id="input-name" placeholder="読取ボタンを押す">
+                <input type="text" id="input-name" placeholder="名前を読取/入力">
             </div>
             <button id="scan-name-btn" class="btn-action btn-name">名前読取</button>
         </div>
@@ -93,7 +97,7 @@
         <div class="input-row">
             <div class="input-group">
                 <label>期限日付</label>
-                <input type="text" id="input-date" placeholder="読取ボタンを押す">
+                <input type="date" id="input-date">
             </div>
             <button id="scan-date-btn" class="btn-action btn-date">日付読取</button>
         </div>
@@ -102,7 +106,7 @@
 
         <div class="controls-extra">
             <button id="toggle-history" class="btn-sub">共有リストを表示</button>
-            <div class="ver-badge">v1.2.2</div>
+            <div class="ver-badge">v1.2.3</div>
         </div>
     </div>
 
@@ -118,7 +122,7 @@
 <canvas id="canvas-temp"></canvas>
 
 <script>
-    // --- Firebase設定 (imageから転記済み) ---
+    // --- Firebase設定 ---
     const firebaseConfig = {
         apiKey: "AIzaSyAIy_4IGs-HXp_Yn7cX1Lt6_WjCSrCncQY",
         authDomain: "okazu-food-manager.firebaseapp.com",
@@ -143,7 +147,6 @@
     let currentZoom = 1.0;
     let initialPinchDistance = null;
 
-    // カメラ起動
     async function startCamera() {
         if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
         try {
@@ -153,12 +156,11 @@
             video.onloadedmetadata = () => { 
                 video.play(); 
                 statusBar.innerText = "Ready (ピンチでズーム可)";
-                setTimeout(() => applyZoom(1.5), 500); // 初期ズーム
+                setTimeout(() => applyZoom(1.5), 500);
             };
         } catch (e) { statusBar.innerText = "カメラエラー"; console.error(e); }
     }
 
-    // ズーム適用関数
     async function applyZoom(val) {
         if (!videoTrack) return;
         try {
@@ -167,25 +169,31 @@
                 currentZoom = Math.max(cap.zoom.min, Math.min(val, cap.zoom.max));
                 await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
             }
-        } catch(e) { console.log("Zoom not supported"); }
+        } catch(e) {}
     }
 
-    // ピンチズームイベント
+    // ピンチズーム
     document.getElementById('camera-section').addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-            initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-        }
+        if (e.touches.length === 2) initialPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
     }, { passive: false });
-
     document.getElementById('camera-section').addEventListener('touchmove', (e) => {
         if (e.touches.length === 2 && initialPinchDistance) {
             e.preventDefault();
             const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            const delta = (dist - initialPinchDistance) / 100;
-            applyZoom(currentZoom + delta);
+            applyZoom(currentZoom + (dist - initialPinchDistance) / 100);
             initialPinchDistance = dist;
         }
     }, { passive: false });
+
+    // 日付文字列を YYYY-MM-DD に変換
+    function formatToDateInput(text) {
+        const d = text.match(/\d+/g);
+        if (!d || d.length < 2) return "";
+        let y = d[0].length === 2 ? "20" + d[0] : d[0];
+        let m = d[1].padStart(2, '0');
+        let day = d[2] ? d[2].padStart(2, '0') : "01";
+        return `${y}-${m}-${day}`;
+    }
 
     async function scan(type) {
         if (!worker) worker = await Tesseract.createWorker(['jpn', 'eng']);
@@ -197,13 +205,16 @@
         canvas.getContext('2d').drawImage(video, rect.left*sx, rect.top*sy, rect.width*sx, rect.height*sy, 0, 0, canvas.width, canvas.height);
         try {
             const { data: { text } } = await worker.recognize(canvas);
-            if (type === 'name') inputName.value = text.trim();
-            else inputDate.value = (text.match(/(\d{2,4}[\.\/\-\s年]+\d{1,2}[\.\/\-\s月]+\d{1,2})/g) || [text.trim()])[0];
+            if (type === 'name') {
+                inputName.value = text.trim();
+            } else {
+                const dateMatch = (text.match(/(\d{2,4}[\.\/\-\s年]+\d{1,2}[\.\/\-\s月]+\d{1,2})/g) || [text.trim()])[0];
+                inputDate.value = formatToDateInput(dateMatch);
+            }
             statusBar.innerText = "読取完了";
         } catch (e) { statusBar.innerText = "解析失敗"; }
     }
 
-    // Firebase保存
     document.getElementById('save-btn').addEventListener('click', () => {
         if (!inputName.value || !inputDate.value) return alert("未入力があります");
         const newItem = {
@@ -215,17 +226,8 @@
         db.push(newItem).then(() => {
             statusBar.innerText = "クラウドに保存しました";
             inputName.value = ""; inputDate.value = "";
-        }).catch(e => console.error("Firebase Save Error:", e));
+        });
     });
-
-    function parseDate(str) {
-        const d = str.match(/\d+/g);
-        if (!d || d.length < 2) return new Date(2999, 11, 31);
-        let y = d[0].length === 2 ? 2000 + parseInt(d[0]) : parseInt(d[0]);
-        let m = parseInt(d[1]) - 1;
-        let day = d[2] ? parseInt(d[2]) : 1;
-        return new Date(y, m, day);
-    }
 
     function toggleHistory() {
         const panel = document.getElementById('history-panel');
@@ -237,9 +239,9 @@
         const listItems = [];
         for (let id in data) { listItems.push({ id, ...data[id] }); }
         const today = new Date(); today.setHours(0,0,0,0);
-        listItems.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+        listItems.sort((a, b) => new Date(a.date) - new Date(b.date));
         document.getElementById('history-list').innerHTML = listItems.map(h => {
-            const diffDays = Math.ceil((parseDate(h.date) - today) / (86400000));
+            const diffDays = Math.ceil((new Date(h.date) - today) / 86400000);
             const color = diffDays <= 3 ? "#ff4444" : "#00ff00";
             return `
                 <div class="history-item">
