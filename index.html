@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Food Manager v1.4.2</title>
+    <title>Food Manager v1.4.3</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
@@ -111,13 +111,12 @@
             padding-bottom: calc(18px + env(safe-area-inset-bottom));
         }
 
-        /* 写真確認エリア（拡大＋スクロール） */
         #img-container {
             width: 100%; aspect-ratio: 1/1; overflow: hidden; position: relative;
-            border-radius: 12px; background: #111; margin-bottom: 20px; touch-action: none;
+            border-radius: 12px; background: #000; margin-bottom: 20px; touch-action: none;
         }
         #edit-img {
-            width: 100%; height: 100%; object-fit: contain;
+            width: 100%; height: 100%; object-fit: cover;
             position: absolute; top: 0; left: 0;
             transition: transform 0.1s ease-out; transform-origin: center;
         }
@@ -129,7 +128,7 @@
 
 <div id="main-container">
     <div id="camera-section">
-        <div class="ver-label">v1.4.2</div>
+        <div class="ver-label">v1.4.3</div>
         <button class="btn-reload" onclick="location.reload()">更新</button>
         <video id="camera-view" playsinline autoplay muted></video>
     </div>
@@ -165,7 +164,7 @@
 
     <div id="detail-panel" class="overlay-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <span style="font-weight:bold; font-size:18px;">拡大確認・編集</span>
+            <span style="font-weight:bold; font-size:18px;">確認・編集</span>
             <button onclick="closePanel('detail-panel')" style="background:#333; color:#fff; border:none; border-radius:50%; width:36px; height:36px; font-size:18px;">×</button>
         </div>
         <div id="img-container">
@@ -247,7 +246,7 @@
         });
     });
 
-    // 自由な拡大とスクロール（パン）
+    // 画像外へのスクロールを禁止した拡大・パン
     let scale = 1, lastScale = 1;
     let posX = 0, posY = 0, startX = 0, startY = 0;
     let initialDist = 0;
@@ -266,6 +265,8 @@
 
     imgCont.addEventListener('touchmove', (e) => {
         e.preventDefault();
+        const containerSize = imgCont.clientWidth;
+        
         if (e.touches.length === 1) {
             posX = e.touches[0].pageX - startX;
             posY = e.touches[0].pageY - startY;
@@ -273,6 +274,12 @@
             const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
             scale = Math.min(Math.max(1, lastScale * (dist / initialDist)), 4);
         }
+
+        // バウンダリ制限（画像が枠内に収まるように移動量を制限）
+        const limit = (containerSize * scale - containerSize) / 2;
+        posX = Math.min(limit, Math.max(-limit, posX));
+        posY = Math.min(limit, Math.max(-limit, posY));
+
         updateTransform();
     });
 
