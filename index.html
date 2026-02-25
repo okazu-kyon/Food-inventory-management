@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Food Manager v1.0.7</title>
+    <title>Food Manager v1.0.8</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
-            --bg-color: #1a1a1a;
-            --overlay-color: rgba(0, 0, 0, 0.5);
-            --guide-color: #ffffff;
+            --bg-color: #000000;
+            --panel-bg: rgba(25, 25, 25, 0.95);
             --accent-color: #00ff00;
             --name-color: #00ccff;
             --text-color: #ffffff;
@@ -18,138 +17,125 @@
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: var(--bg-color); color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden; touch-action: none; -webkit-user-select: none;
+            font-family: -apple-system, sans-serif; overflow: hidden;
+            touch-action: none; -webkit-user-select: none;
         }
 
         #video-container {
             position: relative; width: 100%; height: 100vh;
-            background: #000; display: flex; justify-content: center; align-items: center;
+            display: flex; flex-direction: column;
         }
 
-        video { width: 100%; height: 100%; object-fit: cover; }
+        video { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 1; }
 
-        /* オーバーレイ・ガイド枠 */
+        /* 結果入力パネル（上部に固定して重なりを回避） */
+        #result-panel {
+            position: relative; z-index: 10;
+            background: var(--panel-bg); padding: 12px;
+            border-bottom: 1px solid #444; box-sizing: border-box;
+        }
+
+        .ver-badge { font-size: 9px; color: #666; text-align: right; margin-bottom: 4px; }
+        .input-group { margin-bottom: 8px; }
+        .input-group label { font-size: 10px; color: #aaa; display: block; }
+        input { 
+            width: 100%; background: #333; border: 1px solid #555; color: #fff; 
+            padding: 8px; border-radius: 6px; box-sizing: border-box; font-size: 16px;
+        }
+
+        /* 中央ガイドエリア */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            pointer-events: none; gap: 30px;
+            pointer-events: none; z-index: 5; gap: 25px;
         }
 
         .guide-name {
-            width: 80%; height: 65px; border: 2px solid var(--name-color);
-            border-radius: 8px; position: relative;
-            box-shadow: 0 0 0 5000px var(--overlay-color);
+            width: 75%; height: 50px; border: 1px solid var(--name-color);
+            border-radius: 4px; position: relative; background: rgba(0, 204, 255, 0.05);
         }
-        .guide-name::after { content: '商品名 (日本語)'; position: absolute; top: -22px; left: 0; color: var(--name-color); font-size: 12px; font-weight: bold; }
-
         .guide-date {
-            width: 80%; height: 80px; border: 2px solid var(--guide-color);
-            border-radius: 8px; position: relative;
+            width: 75%; height: 70px; border: 1px solid var(--accent-color);
+            border-radius: 4px; position: relative; background: rgba(0, 255, 0, 0.05);
         }
-        .guide-date::after { content: '日付 (数字)'; position: absolute; top: -22px; left: 0; color: var(--guide-color); font-size: 12px; font-weight: bold; }
-        .guide-date::before {
-            content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px;
-            border: 4px solid var(--accent-color);
-            clip-path: polygon(0 0, 20px 0, 20px 4px, 4px 4px, 4px 20px, 0 20px, 100% 0, calc(100% - 20px) 0, calc(100% - 20px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 20px, 100% 20px, 100% 100%, calc(100% - 20px) 100%, calc(100% - 20px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 20px), 100% calc(100% - 20px), 0 100%, 20px 100%, 20px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 20px), 0 calc(100% - 20px));
+        .guide-name::after, .guide-date::after {
+            content: attr(data-label); position: absolute; top: -18px; left: 0; font-size: 10px; font-weight: bold;
         }
 
-        /* 結果入力パネル */
-        #result-panel {
-            position: absolute; top: 20px; width: 92%; left: 4%;
-            background: rgba(0, 0, 0, 0.9); padding: 15px; border-radius: 12px;
-            border: 1px solid #444; box-sizing: border-box; z-index: 20;
-        }
-
-        .input-group { margin-bottom: 8px; }
-        .input-group label { font-size: 10px; color: #aaa; display: block; margin-bottom: 2px; }
-        input { 
-            width: 100%; background: #2a2a2a; border: 1px solid #555; color: #fff; 
-            padding: 10px; border-radius: 6px; box-sizing: border-box; font-size: 16px;
-        }
-
+        /* 下部コントロールエリア */
         .controls {
-            position: absolute; bottom: 30px; width: 100%;
-            display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 10;
+            position: absolute; bottom: 20px; width: 100%;
+            display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 10;
         }
 
         .btn-main {
-            background: #ffffff; color: #000; border: none; padding: 14px 50px;
-            border-radius: 30px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            background: #ffffff; color: #000; border: none; padding: 14px 60px;
+            border-radius: 30px; font-size: 18px; font-weight: bold;
         }
-        .btn-save { background: var(--accent-color); color: #000; width: 100%; margin-top: 10px; font-size: 16px; }
+        .btn-save { background: var(--accent-color); width: 100%; margin-top: 5px; padding: 10px; font-size: 15px; }
+
+        #status-display {
+            background: rgba(0,0,0,0.7); color: var(--accent-color);
+            padding: 4px 12px; border-radius: 10px; font-size: 12px; min-height: 1.2em;
+        }
 
         #history-panel {
-            position: absolute; bottom: 0; width: 100%; height: 40%;
-            background: rgba(15, 15, 15, 0.98); overflow-y: auto; 
-            padding: 20px; border-top: 1px solid #333; display: none; box-sizing: border-box; z-index: 30;
+            position: absolute; bottom: 0; width: 100%; height: 50%;
+            background: #111; z-index: 30; display: none; padding: 15px; box-sizing: border-box; overflow-y: auto;
         }
-
-        .history-item { 
-            display: flex; flex-direction: column; padding: 10px 0; border-bottom: 1px solid #2a2a2a;
-        }
-        .history-item .h-name { font-weight: bold; color: var(--name-color); }
-        .history-item .h-date { color: var(--accent-color); font-family: monospace; }
-
-        .ver-badge { font-size: 9px; color: #666; position: absolute; top: 5px; right: 10px; }
-        #status-info { font-size: 11px; color: #00ff00; margin-top: 5px; text-align: center; }
-        canvas { display: none; }
     </style>
 </head>
 <body>
 
 <div id="video-container">
-    <video id="camera-view" playsinline autoplay muted></video>
-    <canvas id="canvas-name"></canvas>
-    <canvas id="canvas-date"></canvas>
-    
-    <div class="overlay">
-        <div class="guide-name" id="guide-name"></div>
-        <div class="guide-date" id="guide-date"></div>
-    </div>
-    
     <div id="result-panel">
-        <div class="ver-badge">Ver. 1.0.7</div>
+        <div class="ver-badge">Ver. 1.0.8</div>
         <div class="input-group">
-            <label>読み取った食品名</label>
+            <label>食品名</label>
             <input type="text" id="input-name" placeholder="---">
         </div>
         <div class="input-group">
-            <label>読み取った期限日付</label>
+            <label>期限日付</label>
             <input type="text" id="input-date" placeholder="---">
         </div>
-        <button id="save-btn" class="btn-main btn-save">この内容でリストに保存</button>
-        <div id="status-info">Ready</div>
+        <button id="save-btn" class="btn-main btn-save">リストに保存</button>
+    </div>
+
+    <video id="camera-view" playsinline autoplay muted></video>
+    
+    <div class="overlay">
+        <div class="guide-name" data-label="商品名 (日本語)"></div>
+        <div class="guide-date" data-label="日付 (数字)"></div>
     </div>
 
     <div class="controls">
+        <div id="status-display">Ready (ピンチでズーム)</div>
         <button id="scan-btn" class="btn-main">一括読み取り</button>
         <div style="display: flex; gap: 10px;">
             <button id="toggle-history" style="font-size: 12px; padding: 8px 15px; background: #333; color: #fff; border-radius: 20px; border: 1px solid #555;">履歴を表示</button>
-            <button id="start-btn" style="font-size: 12px; padding: 8px 15px; background: #333; color: #fff; border-radius: 20px; border: 1px solid #555;">カメラ再起動</button>
+            <button id="restart-btn" style="font-size: 12px; padding: 8px 15px; background: #333; color: #fff; border-radius: 20px; border: 1px solid #555;">カメラ再起動</button>
         </div>
     </div>
 
     <div id="history-panel">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <span style="font-weight: bold;">保存済み食品リスト</span>
-            <button onclick="toggleHistory()" style="background:none; border:none; color:#ff4444; font-size: 20px;">×</button>
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+            <span style="font-weight:bold;">保存済みリスト</span>
+            <button onclick="toggleHistory()" style="color:#f00; background:none; border:none; font-size:20px;">×</button>
         </div>
         <div id="history-list"></div>
-        <button onclick="clearHistory()" style="margin-top: 20px; padding: 10px; background: #300; color: #f66; border: 1px solid #600; width: 100%; border-radius: 8px;">履歴をすべて削除</button>
+        <button onclick="clearHistory()" style="width:100%; margin-top:20px; padding:10px; background:#400; color:#fff; border:none;">履歴を全削除</button>
     </div>
 </div>
 
-<script>
-    const VERSION = "1.0.7";
-    console.log(`Starting Food Manager ${VERSION}`);
+<canvas id="canvas-name" style="display:none;"></canvas>
+<canvas id="canvas-date" style="display:none;"></canvas>
 
+<script>
+    const VERSION = "1.0.8";
     const video = document.getElementById('camera-view');
-    const scanBtn = document.getElementById('scan-btn');
-    const saveBtn = document.getElementById('save-btn');
     const inputName = document.getElementById('input-name');
     const inputDate = document.getElementById('input-date');
-    const statusInfo = document.getElementById('status-info');
+    const statusDisplay = document.getElementById('status-display');
     
     let videoTrack = null;
     let currentZoom = 1.0;
@@ -157,30 +143,35 @@
     let worker = null;
 
     async function initOCR() {
-        try {
-            statusInfo.innerText = "OCRエンジン準備中...";
-            worker = await Tesseract.createWorker(['jpn', 'eng']);
-            statusInfo.innerText = "準備完了 (ピンチでズーム可)";
-        } catch (e) {
-            console.error("OCR Init Error:", e);
-            statusInfo.innerText = "OCR初期化失敗。再起動してください。";
+        if (worker) return;
+        statusDisplay.innerText = "OCR準備中...";
+        worker = await Tesseract.createWorker(['jpn', 'eng']);
+        statusDisplay.innerText = "Ready";
+    }
+
+    async function stopCamera() {
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
         }
     }
 
     async function startCamera() {
+        await stopCamera(); // 既存のカメラを確実に停止
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
             });
             video.srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
-            video.onloadedmetadata = async () => {
-                await video.play();
-                applyZoom(1.5);
+            video.onloadedmetadata = () => {
+                video.play();
+                applyZoom(currentZoom);
             };
+            console.log("Camera started successfully");
         } catch (err) {
-            console.error("Camera Access Error:", err);
-            statusInfo.innerText = "カメラエラー: " + err.name;
+            console.error("Camera Error:", err);
+            statusDisplay.innerText = "カメラ起動失敗: " + err.name;
         }
     }
 
@@ -190,7 +181,7 @@
         if (capabilities.zoom) {
             currentZoom = Math.max(capabilities.zoom.min, Math.min(val, capabilities.zoom.max));
             await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-            statusInfo.innerText = `ズーム: ${currentZoom.toFixed(1)}x`;
+            statusDisplay.innerText = `ズーム: ${currentZoom.toFixed(1)}x`;
         }
     }
 
@@ -209,36 +200,28 @@
 
     async function performOCR() {
         if (!worker) await initOCR();
-        scanBtn.disabled = true;
-        statusInfo.innerText = "スキャン中...";
-
+        statusDisplay.innerText = "スキャン中...";
         const scaleX = video.videoWidth / window.innerWidth;
         const scaleY = video.videoHeight / window.innerHeight;
 
         try {
-            const [rawName, rawDate] = await Promise.all([
-                captureAndOCR('guide-name', 'canvas-name', scaleX, scaleY),
-                captureAndOCR('guide-date', 'canvas-date', scaleX, scaleY)
-            ]);
+            const nameText = await captureOCR('guide-name', 'canvas-name', scaleX, scaleY);
+            const dateText = await captureOCR('guide-date', 'canvas-date', scaleX, scaleY);
 
-            inputName.value = rawName.trim().replace(/\s+/g, ' ');
-            
-            // 日付抽出
+            inputName.value = nameText.trim().replace(/\s+/g, ' ');
             const datePattern = /(\d{2,4}[\.\/\-\s]+\d{1,2}[\.\/\-\s]+\d{1,2})|(\d{6,8})|(\d{2,4}年\d{1,2}月\d{1,2}日)/g;
-            const match = rawDate.match(datePattern);
-            inputDate.value = match ? match[0] : rawDate.trim();
+            const match = dateText.match(datePattern);
+            inputDate.value = match ? match[0] : dateText.trim();
 
-            statusInfo.innerText = "スキャン完了";
-        } catch (err) {
-            console.error("OCR Process Error:", err);
-            statusInfo.innerText = "解析エラー発生";
-        } finally {
-            scanBtn.disabled = false;
+            statusDisplay.innerText = "完了";
+        } catch (e) {
+            console.error("OCR Error:", e);
+            statusDisplay.innerText = "解析失敗";
         }
     }
 
-    async function captureAndOCR(guideId, canvasId, sx, sy) {
-        const guide = document.getElementById(guideId);
+    async function captureOCR(guideClass, canvasId, sx, sy) {
+        const guide = document.querySelector('.' + guideClass);
         const canvas = document.getElementById(canvasId);
         const rect = guide.getBoundingClientRect();
         canvas.width = rect.width * sx;
@@ -249,48 +232,30 @@
         return text;
     }
 
-    saveBtn.addEventListener('click', () => {
+    // 保存機能
+    document.getElementById('save-btn').addEventListener('click', () => {
         const item = { name: inputName.value, date: inputDate.value, ts: new Date().toLocaleString() };
-        if (!item.name || !item.date) return alert("食品名と日付の両方を確認してください");
-        const history = JSON.parse(localStorage.getItem('food_history_v1') || '[]');
+        if (!item.name || !item.date) return alert("内容を確認してください");
+        const history = JSON.parse(localStorage.getItem('food_manager_v1') || '[]');
         history.unshift(item);
-        localStorage.setItem('food_history_v1', JSON.stringify(history));
-        statusInfo.innerText = "リストに保存しました！";
+        localStorage.setItem('food_manager_v1', JSON.stringify(history));
+        statusDisplay.innerText = "保存完了！";
         inputName.value = ""; inputDate.value = "";
     });
 
     function toggleHistory() {
         const panel = document.getElementById('history-panel');
-        const isVisible = panel.style.display === 'block';
-        panel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) updateHistoryDisplay();
-    }
-
-    function updateHistoryDisplay() {
-        const list = document.getElementById('history-list');
-        const history = JSON.parse(localStorage.getItem('food_history_v1') || '[]');
-        if (history.length === 0) {
-            list.innerHTML = '<div style="color:#666; text-align:center; margin-top:20px;">履歴はありません</div>';
-            return;
-        }
-        list.innerHTML = history.map(h => `
-            <div class="history-item">
-                <span class="h-name">${h.name}</span>
-                <span class="h-date">期限: ${h.date}</span>
-                <span style="font-size:9px; color:#444;">登録: ${h.ts}</span>
-            </div>
-        `).join('');
-    }
-
-    function clearHistory() {
-        if(confirm("すべての履歴を削除しますか？")) { 
-            localStorage.removeItem('food_history_v1'); 
-            updateHistoryDisplay(); 
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        if (panel.style.display === 'block') {
+            const list = JSON.parse(localStorage.getItem('food_manager_v1') || '[]');
+            document.getElementById('history-list').innerHTML = list.map(h => `<div style="border-bottom:1px solid #333; padding:8px 0;"><div style="color:var(--name-color); font-weight:bold;">${h.name}</div><div style="color:var(--accent-color);">${h.date}</div></div>`).join('');
         }
     }
 
-    scanBtn.addEventListener('click', performOCR);
-    startBtn.addEventListener('click', startCamera);
+    function clearHistory() { if(confirm("履歴を削除しますか？")) { localStorage.removeItem('food_manager_v1'); toggleHistory(); } }
+
+    document.getElementById('scan-btn').addEventListener('click', performOCR);
+    document.getElementById('restart-btn').addEventListener('click', startCamera);
     document.getElementById('toggle-history').addEventListener('click', toggleHistory);
     window.addEventListener('load', () => { startCamera(); initOCR(); });
 </script>
